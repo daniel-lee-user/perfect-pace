@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GPX File Uploader</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Upload a GPX File</h1>
+        
+        <input type="file" id="fileInput" accept=".gpx" />
+        <label for="fileInput">Choose a GPX file</label>
+
+        <div id="errorMessage" class="error"></div>
+        
+        <footer>
+            &copy; 2024 Perfect Pace
+        </footer>
+    </div>
+    <!--including togeojson library-->
+    <script src="https://unpkg.com/@mapbox/togeojson@0.16.0/togeojson.js"></script>
+    <script src="script.js"></script>
+
+</body>
+</html>

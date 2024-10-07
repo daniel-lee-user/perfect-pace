@@ -14,6 +14,7 @@ class Segment:
         self.distance = self.calculate_distance()
         self.elevation_change = self.end_ele - self.start_ele if self.start_ele and self.end_ele else None
         self.slope_angle = self.calculate_slope_angle()
+        self.grade = self.calculate_grade()
 
     def calculate_distance(self):
         radius = 6371
@@ -31,11 +32,15 @@ class Segment:
             horizontal_distance = math.sqrt(self.distance**2 - elevation_change**2) if elevation_change else self.distance
             return math.atan2(elevation_change, horizontal_distance) * (180 / math.pi)
         return None
+    
+    def calculate_grade(self):
+        return self.elevation_change / self.distance * 100
 
     def __repr__(self):
         return f"Segment(Start: ({self.start_lat}, {self.start_lon}), End: ({self.end_lat}, {self.end_lon}), " \
                f"Distance: {self.distance:.2f} meters, Elevation Change: {self.elevation_change:.2f}, " \
-               f"Slope Angle: {self.slope_angle:.2f} degrees)"
+               f"Slope Angle: {self.slope_angle:.2f} degrees)" \
+               f"Grade: {self.grade:.2f}%"
 
 def parse_gpx(file_path):
     with open(file_path, 'r') as gpx_file:

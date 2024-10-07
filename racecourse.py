@@ -1,0 +1,159 @@
+import gpx_parser
+import numpy as np
+import matplotlib
+
+conversion = {
+    'meters_to_miles': 0.0006213712,
+    'meters_to_feet': 3.28084,
+    'miles_to_feet': 5280,
+    'miles_to_meters': 1609.34,
+    'feet_to_miles': 0.000189394,
+    'feet_to_meters': 0.3048,
+    'meters_to_km': 1000,
+    'km_to_meters': 0.001
+}
+
+# TODO: Remove hard-coded conversions to feet and miles
+# elevation data is stored as feet
+# distance is stored as miles
+# pace is stored as min/mile
+
+class RaceCourse:
+    def __init__(self, name):
+        self.course_name = name
+
+    @staticmethod
+    def calculate_grade(elevation_change, distance):
+        return (elevation_change / distance) * 100
+    
+    def gen_race_plot(self, file_path):
+        fig,ax = matplotlib.pyplot.subplots()
+        fig.set_figwidth(20)
+        distance_starts = np.insert(self.agg_distance, 0,0)[:-1]
+        ax.plot(distance_starts, self.elevations, label ='elevation', color='blue')
+        ax.set_xlabel('distance (miles)')
+        ax.set_ylabel('elevation (feet)')
+        ax.set_title(self.course_name)
+        matplotlib.pyplot.savefig(file_path, bbox_inches='tight',dpi=300)
+
+    def repr_segment(self, i):
+        raise NotImplementedError("You should implement this method on a subclass")
+
+    # TODO: hard coded smoothing values 
+    def smooth_attribute(self, attribute):
+        smoothing_factor = max(int(self.n_segments/10), 1)
+        smoothing_factor -= smoothing_factor % 2 == 0
+        # print(f'smoothing factor is odd: {smoothing_factor % 2 == 1}')
+
+        pad_width = int(smoothing_factor / 2)
+        padded_attribute = np.pad(attribute, pad_width, 'edge')
+        result = np.convolve(padded_attribute, np.ones(smoothing_factor), 'valid') / smoothing_factor
+        # print(f'dimensions are the same before and after smoothing: {len(attribute) == len(result)}')
+        return result
+    
+    def __repr__(self):
+        return(f"Course Name: {self.course_name} \n"\
+               f"Total Distance: {self.total_distance:.2f} miles\n"\
+                f"Total Segments: {self.n_segments}")
+
+class RandomRaceCourse(RaceCourse):
+    def apply_smoothing(self):
+
+        for i in range(2):
+            self.elevation_changes = self.smooth_attribute(self.elevation_changes)
+
+    def __init__(self, name, n_segments, total_dist, use_smoothing=True):
+        super().__init__(name)
+        self.n_segments = n_segments
+
+        avg_segment_dist = total_dist / n_segments
+        margin = avg_segment_dist * 0.5
+        seg_low = avg_segment_dist - margin
+        seg_high = avg_segment_dist + margin
+
+        self.distances = np.random.uniform(low=seg_low, high=seg_high, size=n_segments) # miles
+                
+        ELEVATION_SCALE = 200 * avg_segment_dist   # |RISE / RUN|  <= 0.07
+
+        self.elevation_changes = np.random.normal(loc=0, scale=ELEVATION_SCALE, size=n_segments) #*conversion['feet_to_miles'] # FEET TO MILES CONVERSION
+
+        if use_smoothing:
+            self.apply_smoothing()
+
+        self.distances = self.distances# # make sure distances sum to total_dist
+        grade_vf = np.vectorize(self.calculate_grade)
+        self.grades = grade_vf(self.elevation_changes *conversion['feet_to_miles'],self.distances) 
+        self.total_distance = total_dist
+        self.agg_distance = np.cumsum(self.distances)
+
+        self.gen_elevations() # arbitrary
+
+    def gen_elevations(self):
+        acc = 0
+        self.elevations = []
+
+        for el in self.elevation_changes:
+            acc += el
+            self.elevations += [acc]
+        
+        self.elevations = np.array(self.elevations)
+        self.elevations = self.elevations-min(self.elevations)
+    
+    def repr_segment(self,i):
+        return (f"segment {i} \n"\
+                f"{self.agg_distance[i]:.2f} miles \n"\
+                f"elevation: {self.elevations[i]:.2f} feet \n"\
+                f"grade: {self.grades[i]:.2f} degrees")
+        
+class RealRaceCourse(RaceCourse):
+    # TODO: IMPLEMENT OPTIMAL / ACCURATE ALGORITHM. 
+    # VERIFY THAT THESE RECOMPUTED VALUES ARE STILL CLOSE TO THE ORIGINAL
+    def apply_smoothing(self):
+        # 1. smooth elevation
+        self.elevations = self.smooth_attribute(self.elevations)
+        self.end_elevations = self.smooth_attribute(self.end_elevations)
+        # 2. recompute elevation changes
+        self.elevation_changes = self.end_elevations - self.elevations
+        # 3. recompute grades
+        grade_vf = np.vectorize(self.calculate_grade)
+        self.grades = grade_vf(self.elevation_changes *conversion['feet_to_miles'],self.distances) 
+
+    def __init__(self, name, file_path, use_smoothing=False):
+        super().__init__(name)
+        self.segments = gpx_parser.parse_gpx(file_path)
+        self.n_segments = len(self.segments)
+        self.elevation_changes = []
+        self.elevations = []
+        self.end_elevations = []
+        self.grades = []
+        self.distances = []
+
+        for i in range(self.n_segments):
+            seg = self.segments[i]
+            try:
+                self.elevation_changes.append(seg.elevation_change * conversion['meters_to_miles']) 
+                self.elevations.append(seg.start_ele)
+                self.end_elevations.append(seg.end_ele)
+                self.grades.append(seg.grade)
+                self.distances.append(seg.distance * conversion['meters_to_miles']) 
+            except Exception as e:
+                print(f'error at segment {i}')   
+                print(repr(e))          
+
+        self.agg_distance = np.cumsum(self.distances)
+        self.total_distance = self.agg_distance[-1]
+        self.elevation_changes = np.array(self.elevation_changes)
+        self.elevations = np.array(self.elevations)
+        self.end_elevations = np.array(self.end_elevations)
+        self.grades = np.array(self.grades)
+        self.distances = np.array(self.distances)
+
+        if use_smoothing:
+            self.apply_smoothing()
+
+    def repr_segment(self,i):
+        return (f"segment {i} \n"\
+                f"@ ({self.segments[i].start_lat:.2f}, {self.segments[i].start_lon:.2f})\n"
+                f"{self.agg_distance[i]:.2f} miles \n"\
+                f"elevation: {self.elevations[i]:.2f} feet \n"\
+                f"grade: {self.grades[i]:.2f} degrees")

@@ -1,0 +1,22 @@
+0: 6.36 min / mile
+1: 6.67 min / mile
+4: 6.82 min / mile
+39: 6.86 min / mile
+203: 6.89 min / mile
+222: 7.18 min / mile
+224: 6.89 min / mile
+255: 6.72 min / mile
+259: 6.83 min / mile
+264: 5.94 min / mile
+265: 6.46 min / mile
+266: 6.76 min / mile
+270: 6.53 min / mile
+274: 6.80 min / mile
+282: 6.25 min / mile
+283: 6.69 min / mile
+286: 6.84 min / mile
+291: 6.58 min / mile
+292: 6.81 min / mile
+302: 6.86 min / mile
+
+Total time: 180.00

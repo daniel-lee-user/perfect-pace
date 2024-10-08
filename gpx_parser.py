@@ -39,7 +39,7 @@ class Segment:
     def __repr__(self):
         return f"Segment(Start: ({self.start_lat}, {self.start_lon}), End: ({self.end_lat}, {self.end_lon}), " \
                f"Distance: {self.distance:.2f} meters, Elevation Change: {self.elevation_change:.2f}, " \
-               f"Slope Angle: {self.slope_angle:.2f} degrees)" \
+               f"Slope Angle: {self.slope_angle:.2f} degrees), " \
                f"Grade: {self.grade:.2f}%"
 
 def parse_gpx(file_path):

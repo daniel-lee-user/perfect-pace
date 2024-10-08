@@ -26,7 +26,7 @@ class RaceCourse:
     def calculate_grade(elevation_change, distance):
         return (elevation_change / distance) * 100
     
-    def gen_race_plot(self, file_path):
+    def gen_course_plot(self, file_path):
         fig,ax = matplotlib.pyplot.subplots()
         fig.set_figwidth(20)
         distances = np.insert(self.end_distance, 0,0)
@@ -34,6 +34,10 @@ class RaceCourse:
         ax.plot(distances, full_elevations, label ='elevation', color='blue')
         ax.set_xlabel('distance (miles)')
         ax.set_ylabel('elevation (feet)')
+        ax2 = ax.twinx()
+        ax2.set_ylabel('grade (%)')
+        full_grades = np.append(self.grades, self.grades[-1])
+        ax2.plot(distances, full_grades, label='grade', color='red')
         ax.set_title(self.course_name)
         matplotlib.pyplot.savefig(file_path, bbox_inches='tight',dpi=300)
 
@@ -41,15 +45,13 @@ class RaceCourse:
         raise NotImplementedError("You should implement this method on a subclass")
 
     # TODO: hard coded smoothing values 
-    def smooth_attribute(self, attribute):
-        smoothing_factor = max(int(self.n_segments/10), 1)
+    # TODO: use more sophisticated smoothing method
+    def smooth_attribute(self, attribute, param=10):
+        smoothing_factor = max(int(self.n_segments/param), 1)
         smoothing_factor -= smoothing_factor % 2 == 0
-        # print(f'smoothing factor is odd: {smoothing_factor % 2 == 1}')
-
         pad_width = int(smoothing_factor / 2)
         padded_attribute = np.pad(attribute, pad_width, 'edge')
         result = np.convolve(padded_attribute, np.ones(smoothing_factor), 'valid') / smoothing_factor
-        # print(f'dimensions are the same before and after smoothing: {len(attribute) == len(result)}')
         return result
     
     def __repr__(self):
@@ -59,9 +61,7 @@ class RaceCourse:
 
 class RandomRaceCourse(RaceCourse):
     def apply_smoothing(self):
-
-        for i in range(2):
-            self.elevation_changes = self.smooth_attribute(self.elevation_changes)
+        self.elevation_changes = self.smooth_attribute(self.elevation_changes, param=10)
 
     def __init__(self, name, n_segments, total_dist, use_smoothing=True):
         super().__init__(name)
@@ -111,17 +111,17 @@ class RandomRaceCourse(RaceCourse):
 class RealRaceCourse(RaceCourse):
     # TODO: IMPLEMENT OPTIMAL / ACCURATE ALGORITHM. 
     # VERIFY THAT THESE RECOMPUTED VALUES ARE STILL CLOSE TO THE ORIGINAL
-    def apply_smoothing(self):
+    def apply_smoothing(self, param):
         # 1. smooth elevation
-        self.elevations = self.smooth_attribute(self.elevations)
-        self.end_elevations = self.smooth_attribute(self.end_elevations)
+        self.elevations = self.smooth_attribute(self.elevations, param)
+        self.end_elevations = self.smooth_attribute(self.end_elevations, param)
         # 2. recompute elevation changes
         self.elevation_changes = self.end_elevations - self.elevations
         # 3. recompute grades
         grade_vf = np.vectorize(self.calculate_grade)
         self.grades = grade_vf(self.elevation_changes *conversion['feet_to_miles'],self.distances) 
 
-    def __init__(self, name, file_path, use_smoothing=False):
+    def __init__(self, name, file_path, use_smoothing=False, param=10):
         super().__init__(name)
         self.segments = gpx_parser.parse_gpx(file_path)
         self.n_segments = len(self.segments)
@@ -154,7 +154,7 @@ class RealRaceCourse(RaceCourse):
         self.distances = np.array(self.distances)
 
         if use_smoothing:
-            self.apply_smoothing()
+            self.apply_smoothing(param)
 
     def repr_segment(self,i):
         return (f"segment {i} \n"\

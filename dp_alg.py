@@ -86,10 +86,8 @@ class PacingPlan:
     @staticmethod
     def adjust_pace(base_pace, grade):
         if grade > 0:
-            # Uphill
             return base_pace + (12 * abs(grade) / 60) 
         else:
-            # Downhill
             return base_pace - (7 * abs(grade) / 60)
         
     """TODO: rewrite to modify paces directly rather than returning """
@@ -144,7 +142,7 @@ class PacingPlanDP(PacingPlan):
         super().__init__(race_course, target_time, max_paces)
         n = self.get_n_segments()
         self.WP = np.zeros((n,n+1))
-        self.LOSS = np.ones((n, n+1, max_paces)) * np.inf #TODO: change to infinity, or empty?
+        self.LOSS = np.ones((n, n+1, max_paces)) * np.inf
         self.OPT = np.ones((n, n+1, max_paces)).astype(int)*-1
     
     # TODO: Optional function, returns the pace you run at segment i
@@ -240,7 +238,7 @@ class PacingPlanDP(PacingPlan):
         self.gen_aggregate_paces()
         self.get_elapsed_time_of_plan() # generates elapsed time as well
 
-    def gen_pace_chart(self,file_path, include_optimal_paces=False, include_recommended_paces=True, use_seg_number=False):
+    def gen_pace_chart(self,file_path, include_optimal_paces=False, include_recommended_paces=True):
         if not include_optimal_paces and not include_recommended_paces:
             raise ValueError("at least one of include_optimal_paces or include_recommended_paces must be True")
 
@@ -281,7 +279,6 @@ def main():
     while (repeat == True):
 
         file_path = str(input("\nfile path for .gpx file:\t"))
-        # file_path = "data/" + str(input("\nfile name for .gpx file:\t"))
 
         if len(file_path) == 0:
 
@@ -303,10 +300,10 @@ def main():
         if not os.path.exists(directory):
             os.makedirs(directory)
 
-        plot_path = directory+f'{course_name}.jpg'
+        plot_path = directory+f'{course_name} {course.n_segments} segs.jpg'
 
         try:
-            course.gen_race_plot(plot_path)
+            course.gen_course_plot(plot_path)
         except Exception as e:
             print(plot_path)
             raise(e)
@@ -322,7 +319,7 @@ def main():
 
         plan = PacingPlanDP(course, target_time, max_paces)
 
-        plan_identifier = f'{max_paces} paces {target_time:.0f} min'
+        plan_identifier = f'{max_paces} paces {target_time:.0f} min {course.n_segments} segs'
 
         run_DP = bool(int(input('\nrun DP? 0/1\t\t\t')))
 

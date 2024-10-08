@@ -2,6 +2,7 @@ import numpy as np
 import racecourse
 import matplotlib
 import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
 import sys 
 import os.path
 
@@ -58,13 +59,13 @@ class PacingPlan:
                 end_seg = n-1
             else:
                 end_seg = self.changes[i+1] - 1
-            end_dist = self.race_course.agg_distance[end_seg]
+            end_dist = self.race_course.end_distance[end_seg]
 
             if i == 0:
                 start_dist = 0
             else:
                 start_seg = self.changes[i]
-                start_dist = self.race_course.agg_distance[start_seg-1]
+                start_dist = self.race_course.end_distance[start_seg-1]
             
             elapsed_dist = end_dist - start_dist
             
@@ -103,6 +104,32 @@ class PacingPlan:
         preadjusted_times = np.multiply(self.get_distances(), preadjusted_paces)
 
         self.optimal_paces, self.segment_times = self.adjust_paces_to_fit_target_time(preadjusted_paces, preadjusted_times)    
+
+    @staticmethod
+    def get_display_txt_for_pace(pace):
+        # return (f'{pace:.2f}')
+        m, s = divmod(pace*60, 60)
+        return (f'{m:.0f}:{int(s):02d}')
+
+    def __repr__(self):
+        display_txt = ""
+
+        header = f'{self.race_course.course_name}: {self.target_time} minute plan'
+        display_txt += header + '\n\n'
+
+        for i, pace in enumerate(self.recommended_paces):
+            lat_lon_txt = ''
+            if self.race_course is type(racecourse.RealRaceCourse):
+                seg = self.race_course.segments[i]
+                lat_lon_txt = f' @ ({seg.start_lat},{seg.start_lon})'
+            distance_duration = self.race_course.distances[i]
+            start_distance = self.race_course.start_distance[i]
+            txt = f"{i}: {start_distance:.2f} mi\t{self.get_display_txt_for_pace(pace)}/mile for {distance_duration:.2f} mi{lat_lon_txt}"
+            display_txt += txt + '\n'
+        
+        display_txt += f"\nTotal time: {self.get_elapsed_time_of_plan(verbose=False):.2f}"
+
+        return display_txt
 
 class PacingPlanDP(PacingPlan):
     def __init__(self,race_course : racecourse.RaceCourse, target_time, max_paces):
@@ -178,7 +205,7 @@ class PacingPlanDP(PacingPlan):
 
     def calculate_DP(self, verbose=True):
         n = self.get_n_segments()
-        # OPT[i,j,k]: contains the value that we split on with k paces. 
+
         for i in range(n):
             for j in range(i+1, n+1):
                 weighted_pace = np.dot(self.optimal_paces[i:j], self.get_distances()[i:j] / sum(self.get_distances()[i:j]))
@@ -191,9 +218,7 @@ class PacingPlanDP(PacingPlan):
                 print(f'PROGRESSED TO A = {a}')
             for i in range(n):
                 # k >= i + number of pace changes + 1 
-                # j represents the value we split the interval [i,k] on to search the subproblem
                 for k in range(i+a+1, n+1):
-                    
                     j = i+1
                     best_j = j 
                     lowest_loss = self.LOSS[i,i+1,0] + self.LOSS[j,k,a-1]
@@ -216,43 +241,39 @@ class PacingPlanDP(PacingPlan):
         self.backtrack_solution(verbose)
         self.gen_aggregate_paces()
 
-    def gen_pace_chart(self,file_path, include_optimal_paces=False, include_recommended_paces=True):
+    def gen_pace_chart(self,file_path, include_optimal_paces=False, include_recommended_paces=True, use_seg_number=False):
         if not include_optimal_paces and not include_recommended_paces:
             raise ValueError("at least one of include_optimal_paces or include_recommended_paces must be True")
 
         fig,ax = plt.subplots()
         fig.set_figwidth(20)
-        distance_starts = np.insert(self.race_course.agg_distance, 0,0)[:-1]
-        ax.plot(distance_starts, self.race_course.elevations, label ='elevation', color='blue')
+
+        distances = np.insert(self.race_course.end_distance, 0,0)
+        full_elevations = np.append(self.race_course.elevations, self.race_course.end_elevations[-1])
+        ax.plot(distances, full_elevations, label ='elevation', color='blue')
+
         ax.set_xlabel('distance (miles)')
         ax.set_ylabel('elevation (feet)')
         ax.legend(loc="upper left")
 
         ax2 = ax.twinx()
+        ax2.set_ylabel('pace (min/mile)')
 
         if include_optimal_paces:
-            ax2.step(distance_starts, self.optimal_paces, label='optimal paces', color='orange', alpha=0.4)
+            optimal_paces_y = np.append(self.optimal_paces, self.optimal_paces[-1])
+            ax2.step(distances, optimal_paces_y, label='optimal paces', color='orange', alpha=0.4, where='post')
 
         if include_recommended_paces:
-            ax2.step(distance_starts, self.agg_paces, label='recommended paces', color='red')
+            agg_paces_y = np.append(self.agg_paces, self.agg_paces[-1])
+            ax2.step(distances, agg_paces_y, label='recommended paces', color='red', where='post')
 
-            for i, xy in enumerate(zip(distance_starts, self.agg_paces)):
+            for i, xy in enumerate(zip(distances, self.agg_paces)):
                 if i in self.changes:
-                    ax2.annotate(f'{self.agg_paces[i]:.2f}', xy)
+                    pace = self.agg_paces[i]
+                    ax2.annotate(f'{self.get_display_txt_for_pace(pace)}', xy, xytext=(10,10), textcoords='offset pixels')
 
         ax.set_title(f'{self.race_course.course_name} Pacing Plan')
         plt.savefig(file_path, bbox_inches='tight',dpi=300)
-
-    def __repr__(self):
-        display_txt = ""
-
-        for i, pace in enumerate(self.recommended_paces):
-            txt = f"{self.changes[i]}: " + f"{pace:.2f} min / mile"
-            display_txt += txt + '\n'
-        
-        display_txt += f"\nTotal time: {self.get_elapsed_time_of_plan(verbose=False):.2f}"
-
-        return display_txt
     
 
 def main():
@@ -268,7 +289,7 @@ def main():
             print("\nGenerating Random Course\n")
             n_segments = int(input('n_segments: \t\t\t'))
             distance = float(input('distance (miles): \t\t'))
-            course_name = f'random_{distance:.2f}'
+            course_name = f'random {distance:.1f}'
             course = racecourse.RandomRaceCourse(course_name, n_segments, distance, use_smoothing=True)
             file_path = 'data/random/'
 
@@ -283,7 +304,7 @@ def main():
         if not os.path.exists(directory):
             os.makedirs(directory)
 
-        plot_path = directory+'plot_path.jpg'
+        plot_path = directory+f'{course_name}.jpg'
 
         try:
             course.gen_race_plot(plot_path)
@@ -302,20 +323,21 @@ def main():
 
         plan = PacingPlanDP(course, target_time, max_paces)
 
-        plan_identifier = f'{max_paces}_{target_time:.1f}'
+        plan_identifier = f'{max_paces} paces {target_time:.0f} min'
 
         run_DP = bool(int(input('\nrun DP? 0/1\t\t\t')))
 
         if run_DP:
             print('\nRunning DP Algorithm\n')
             plan.handle_DP(verbose=True)
-            pace_plot_file_path = directory+'pace_plan_' + plan_identifier + '.jpg'
-            pace_plan_file_path = directory+'pace_plan_' + plan_identifier + '.txt'
+            pace_plot_file_path = directory+ plan_identifier + '.jpg'
+            pace_plan_file_path = directory+ plan_identifier + '.txt'
             plan.gen_pace_chart(pace_plot_file_path, include_optimal_paces=True, include_recommended_paces=True)
             
             with open(pace_plan_file_path, 'w') as f:
                 f.write(str(plan))
 
         repeat = bool(int(input('\nCreate another pace plan? 0/1\t')))
+        
 if __name__ == '__main__':
     main()

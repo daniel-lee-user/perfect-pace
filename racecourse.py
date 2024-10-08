@@ -29,8 +29,9 @@ class RaceCourse:
     def gen_race_plot(self, file_path):
         fig,ax = matplotlib.pyplot.subplots()
         fig.set_figwidth(20)
-        distance_starts = np.insert(self.agg_distance, 0,0)[:-1]
-        ax.plot(distance_starts, self.elevations, label ='elevation', color='blue')
+        distances = np.insert(self.end_distance, 0,0)
+        full_elevations = np.append(self.elevations, self.end_elevations[-1])
+        ax.plot(distances, full_elevations, label ='elevation', color='blue')
         ax.set_xlabel('distance (miles)')
         ax.set_ylabel('elevation (feet)')
         ax.set_title(self.course_name)
@@ -73,35 +74,36 @@ class RandomRaceCourse(RaceCourse):
 
         self.distances = np.random.uniform(low=seg_low, high=seg_high, size=n_segments) # miles
                 
-        ELEVATION_SCALE = 200 * avg_segment_dist   # |RISE / RUN|  <= 0.07
+        ELEVATION_SCALE = 100 * avg_segment_dist   # |RISE / RUN|  <= 0.07
 
         self.elevation_changes = np.random.normal(loc=0, scale=ELEVATION_SCALE, size=n_segments) #*conversion['feet_to_miles'] # FEET TO MILES CONVERSION
 
         if use_smoothing:
             self.apply_smoothing()
 
-        self.distances = self.distances# # make sure distances sum to total_dist
+        self.distances = self.distances * total_dist / (sum(self.distances)) # make sure distances sum to total_dist
         grade_vf = np.vectorize(self.calculate_grade)
         self.grades = grade_vf(self.elevation_changes *conversion['feet_to_miles'],self.distances) 
         self.total_distance = total_dist
-        self.agg_distance = np.cumsum(self.distances)
-
+        self.end_distance = np.cumsum(self.distances)
+        self.start_distance = np.roll(self.end_distance,1)
+        self.start_distance[0] = 0
         self.gen_elevations() # arbitrary
 
     def gen_elevations(self):
-        acc = 0
-        self.elevations = []
-
-        for el in self.elevation_changes:
-            acc += el
-            self.elevations += [acc]
         
-        self.elevations = np.array(self.elevations)
-        self.elevations = self.elevations-min(self.elevations)
+        self.end_elevations = np.cumsum(self.elevation_changes)
+        self.elevations = np.roll(self.end_elevations,1)
+        self.elevations[0] = 0
+
+        min_val = min(self.end_elevations)
+
+        self.elevations -= min_val
+        self.end_elevations -= min_val
     
     def repr_segment(self,i):
         return (f"segment {i} \n"\
-                f"{self.agg_distance[i]:.2f} miles \n"\
+                f"{self.end_distance[i]:.2f} miles \n"\
                 f"elevation: {self.elevations[i]:.2f} feet \n"\
                 f"grade: {self.grades[i]:.2f} degrees")
         
@@ -140,8 +142,10 @@ class RealRaceCourse(RaceCourse):
                 print(f'error at segment {i}')   
                 print(repr(e))          
 
-        self.agg_distance = np.cumsum(self.distances)
-        self.total_distance = self.agg_distance[-1]
+        self.end_distance = np.cumsum(self.distances)
+        self.start_distance = np.roll(self.end_distance,1)
+        self.start_distance[0] = 0
+        self.total_distance = self.end_distance[-1]
         self.elevation_changes = np.array(self.elevation_changes)
         self.elevations = np.array(self.elevations)
         self.end_elevations = np.array(self.end_elevations)
@@ -154,6 +158,6 @@ class RealRaceCourse(RaceCourse):
     def repr_segment(self,i):
         return (f"segment {i} \n"\
                 f"@ ({self.segments[i].start_lat:.2f}, {self.segments[i].start_lon:.2f})\n"
-                f"{self.agg_distance[i]:.2f} miles \n"\
+                f"{self.end_distance[i]:.2f} miles \n"\
                 f"elevation: {self.elevations[i]:.2f} feet \n"\
                 f"grade: {self.grades[i]:.2f} degrees")

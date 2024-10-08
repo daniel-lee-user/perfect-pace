@@ -1,8 +1,6 @@
 import numpy as np
 import racecourse
-import matplotlib
 import matplotlib.pyplot as plt
-import matplotlib.ticker as ticker
 import sys 
 import os.path
 
@@ -54,6 +52,7 @@ class PacingPlan:
     def get_elapsed_time_of_plan(self, verbose=True):
         n = self.get_n_segments()
         times = []
+        dists = []
         for i, pace in enumerate(self.recommended_paces):
             if i == len(self.recommended_paces) - 1:
                 end_seg = n-1
@@ -74,9 +73,13 @@ class PacingPlan:
                 print(f'segment range [{self.changes[i]}, {end_seg+1}] has dist {elapsed_dist:.2f}')
                 print(f'run at {pace:.2f} min / mile for {time:.2f} minutes')
             times += [time]
+            dists += [elapsed_dist]
 
+        self.elapsed_dists = dists
         self.segment_times = times
-        return sum(times)
+
+        self.true_time = sum(times)
+        return self.true_time
 
     """Returns optimal pace in minutes / mile for a given elevation grade using
     Jack Daniels formula"""
@@ -112,22 +115,27 @@ class PacingPlan:
         return (f'{m:.0f}:{int(s):02d}')
 
     def __repr__(self):
+
+        #TODO: only let this be called if pacing plan has been generated
+
         display_txt = ""
 
         header = f'{self.race_course.course_name}: {self.target_time} minute plan'
         display_txt += header + '\n\n'
+
+        total_time = self.get_elapsed_time_of_plan(verbose=False)
 
         for i, pace in enumerate(self.recommended_paces):
             lat_lon_txt = ''
             if self.race_course is type(racecourse.RealRaceCourse):
                 seg = self.race_course.segments[i]
                 lat_lon_txt = f' @ ({seg.start_lat},{seg.start_lon})'
-            distance_duration = self.race_course.distances[i]
-            start_distance = self.race_course.start_distance[i]
+            distance_duration = self.elapsed_dists[i]
+            start_distance = self.race_course.start_distance[self.changes[i]]
             txt = f"{i}: {start_distance:.2f} mi\t{self.get_display_txt_for_pace(pace)}/mile for {distance_duration:.2f} mi{lat_lon_txt}"
             display_txt += txt + '\n'
         
-        display_txt += f"\nTotal time: {self.get_elapsed_time_of_plan(verbose=False):.2f}"
+        display_txt += f"\nTotal time: {total_time:.2f}"
 
         return display_txt
 
@@ -169,34 +177,28 @@ class PacingPlanDP(PacingPlan):
         if a == 0:
             return {i}
         j = self.OPT[i,k,a]
-        if j == 49:
-            print(f"FOUND 49 range [{i},{k}) with {a} pace changes")
         if verbose:
             print(f"split on index {j}\n")
-        right = self.get_idxs(j,k,a-1)
+        right = self.get_idxs(j,k,a-1, verbose)
         right.add(i)
-
-        if -1 in right:
-            print(f'negative idx returned for range [{i},{k}) with {a} pace changes')
         return right
     
     def backtrack_solution(self, verbose=True):
         n = self.get_n_segments()
 
         # list of segment indices where we change the paces
-        self.changes = np.array(sorted(self.get_idxs(0,n, self.max_paces-1)))
+        self.changes = np.array(sorted(self.get_idxs(0,n, self.max_paces-1, verbose))).astype(int)
 
-        # Todo: Remove assertionerror
+        # TODO: Remove assertionerror
         if len(self.changes) != self.max_paces:
             raise AssertionError('Number of pace changes computed is not equal to max_paces')
 
         # list of pace changes (i.e. [5,7,6.5] means we run 5 min/mile at segment 0 )
         paces = []
 
-        # TODO: debug so that we don't have to reference self.changes and instead can use max_paces
         for j in range(self.max_paces-1):
-            i1 = int(self.changes[j])
-            i2 = int(self.changes[j+1]) # TODO: troubleshoot so this does not manually need to be cast to an int
+            i1 = self.changes[j]
+            i2 = self.changes[j+1]
             paces.append(self.WP[i1,i2])
         
         paces.append(self.WP[int(self.changes[-1]), n])
@@ -229,10 +231,6 @@ class PacingPlanDP(PacingPlan):
                             lowest_loss = loss
                             best_j = j 
                     
-                    # TODO: Remove this when debugging is complete
-                    if verbose and self.LOSS[i,k,a-1] == lowest_loss:
-                        print(f'DON\'T NEED TO SPLIT on interval [{i}:{k}] and a = {a}')
-                    
                     self.LOSS[i,k,a] = lowest_loss
                     self.OPT[i,k,a] = int(best_j)
 
@@ -240,6 +238,7 @@ class PacingPlanDP(PacingPlan):
         self.calculate_DP(verbose)
         self.backtrack_solution(verbose)
         self.gen_aggregate_paces()
+        self.get_elapsed_time_of_plan() # generates elapsed time as well
 
     def gen_pace_chart(self,file_path, include_optimal_paces=False, include_recommended_paces=True, use_seg_number=False):
         if not include_optimal_paces and not include_recommended_paces:

@@ -74,21 +74,22 @@ class RandomRaceCourse(RaceCourse):
 
         self.distances = np.random.uniform(low=seg_low, high=seg_high, size=n_segments) # miles
                 
-        ELEVATION_SCALE = 100 * avg_segment_dist   # |RISE / RUN|  <= 0.07
+        # TODO: improve hardcoded 100 value
+        ELEVATION_SCALE = 100 * avg_segment_dist
 
-        self.elevation_changes = np.random.normal(loc=0, scale=ELEVATION_SCALE, size=n_segments) #*conversion['feet_to_miles'] # FEET TO MILES CONVERSION
+        self.elevation_changes = np.random.normal(loc=0, scale=ELEVATION_SCALE, size=n_segments) 
 
         if use_smoothing:
             self.apply_smoothing()
 
-        self.distances = self.distances * total_dist / (sum(self.distances)) # make sure distances sum to total_dist
+        self.distances = self.distances * total_dist / (sum(self.distances))
         grade_vf = np.vectorize(self.calculate_grade)
         self.grades = grade_vf(self.elevation_changes *conversion['feet_to_miles'],self.distances) 
         self.total_distance = total_dist
         self.end_distance = np.cumsum(self.distances)
         self.start_distance = np.roll(self.end_distance,1)
         self.start_distance[0] = 0
-        self.gen_elevations() # arbitrary
+        self.gen_elevations()
 
     def gen_elevations(self):
         

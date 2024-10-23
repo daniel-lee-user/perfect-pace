@@ -7,8 +7,9 @@
     <link rel="stylesheet" href="node_modules/leaflet/dist/leaflet.css" />
     <script src="node_modules/leaflet/dist/leaflet.js"></script>
     <script src="http://d3js.org/d3.v3.min.js" charset="utf-8"></script>
+    <script src='//api.tiles.mapbox.com/mapbox.js/plugins/leaflet-omnivore/v0.3.1/leaflet-omnivore.min.js'></script>
     <link rel="stylesheet" href="node_modules/leaflet.elevation/dist/Leaflet.Elevation-0.0.2.css"/>
-    <script src="node_modules/leaflet.elevation/dist/Leaflet.Elevation-0.0.2.min.js"></script>
+    <script src="elevationgraph2.js"></script>
     <style>
       html, body {
           height: 100%; /* Full height for both html and body */
@@ -34,14 +35,16 @@
           const geoData = localStorage.getItem('geoData');
           if (geoData) {
               const geojson = JSON.parse(geoData);
-              console.log(geoData)
-              // Create height graph (elevation profile)
+              console.log(geoData);
               var el = L.control.elevation();
               el.addTo(map);
+              //const geoJsonLayer = L.geoJSON(geojson).addTo(map);
               const geoJsonLayer = L.geoJSON(geojson, {
-                  onEachFeature: el.addData.bind(el)
+                  onEachFeature: el.addData.bind(el),
+                  style: function(feature) {
+                    return {color: feature.properties.color}
+                  }
               }).addTo(map);
-
               // Fit the map bounds to the GeoJSON layer
               map.fitBounds(geoJsonLayer.getBounds());
           } else {
@@ -49,6 +52,7 @@
           }
               
       });
+      
     </script>
 </body>
 </html>

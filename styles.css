@@ -7,6 +7,7 @@ body {
     justify-content: center;
     align-items: center;
     height: 100vh;
+    flex-direction: column;
 }
 
 .container {
@@ -29,6 +30,7 @@ input[type="file"] {
     display: none;
 }
 
+/* Default file input label styling */
 label {
     background-color: #007bff;
     color: white;
@@ -36,10 +38,31 @@ label {
     border-radius: 5px;
     cursor: pointer;
     font-size: 16px;
+    margin-top: 20px;
 }
 
 label:hover {
     background-color: #0056b3;
+}
+
+/* Specific styling for the pace changes label */
+#paceChanges-container label {
+    background-color: transparent;
+    color: #333;
+    cursor: default; /* No hover effect */
+    padding: 0;
+    font-size: 16px;
+    margin-bottom: 10px;
+}
+
+/* Specific styling for the pace changes label */
+.checkbox-container label {
+    background-color: transparent;
+    color: #333;
+    cursor: default; /* No hover effect */
+    padding: 0;
+    font-size: 16px;
+    margin-bottom: 10px;
 }
 
 #fileContents {
@@ -65,7 +88,35 @@ label:hover {
 }
 
 footer {
-    margin-top: 20px;
+    margin-top: auto;
     font-size: 12px;
     color: #888;
+}
+
+/* Styling for the checkbox container */
+.checkbox-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 15px;
+}
+
+.checkbox-container input {
+    margin-right: 10px;
+}
+
+/* Pace changes input styling */
+input[type="number"] {
+    margin-top: 10px;
+    padding: 10px;
+    border-radius: 5px;
+    border: 1px solid #ddd;
+    font-size: 16px;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+/* Add margin between pace input and file upload */
+#paceChanges-container {
+    margin-bottom: 20px;
 }

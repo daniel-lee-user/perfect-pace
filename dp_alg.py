@@ -24,30 +24,20 @@ conversion = {
 class PacingPlan:
 
     def __init__(self,race_course : racecourse.RaceCourse, target_time, max_paces):
-        self.adjust_pace_vf = np.vectorize(PacingPlan.adjust_pace)
+        self.get_pace_adjustments_vf = np.vectorize(PacingPlan.get_pace_adjustment)
         self.target_time = target_time
         self.race_course = race_course
         self.max_paces = max_paces
-        self.base_pace = target_time / self.get_total_distance() #average ideal pace for target time
-        preadjusted_paces = self.adjust_pace_vf(self.base_pace, self.get_grades())
-        preadjusted_times = np.multiply(self.get_distances(), preadjusted_paces)
-
-        self.optimal_paces, self.segment_times = self.adjust_paces_to_fit_target_time(preadjusted_paces, preadjusted_times)    
+        self.generate_optimal_paces()
 
     def get_grades(self):
         return self.race_course.grades
-    
-    def get_total_distance(self):
-        return self.race_course.total_distance
     
     def get_distances(self):
         return self.race_course.distances
     
     def get_n_segments(self):
         return self.race_course.n_segments
-    
-    def get_optimal_pace_for_segment(self, idx):
-        return self.optimal_paces[idx]
         
     def get_elapsed_time_of_plan(self, verbose=True):
         n = self.get_n_segments()
@@ -81,30 +71,21 @@ class PacingPlan:
         self.true_time = sum(times)
         return self.true_time
 
-    """Returns optimal pace in minutes / mile for a given elevation grade using
+    """Returns amount that we change the pace in minutes / mile for a given elevation grade using
     Jack Daniels formula"""
     @staticmethod
-    def adjust_pace(base_pace, grade):
+    def get_pace_adjustment(grade):
         if grade > 0:
-            return base_pace + (12 * abs(grade) / 60) 
+            return (12 * abs(grade) / 60)
         else:
-            return base_pace - (7 * abs(grade) / 60)
-        
-    """TODO: rewrite to modify paces directly rather than returning """
-    def adjust_paces_to_fit_target_time(self, paces, segment_times):
-        adjustment_factor = self.target_time / segment_times.sum()
-        paces = paces*adjustment_factor
-        segment_times = np.multiply(self.get_distances(), paces)
-        return paces, segment_times
-
-    """Generates optimal paces at each segment and writes to instance"""
-    def generate_optimal_paces(self, target_time):
-        self.target_time = target_time
-        self.base_pace = target_time / self.total_distance #average ideal pace for target time
-        preadjusted_paces = self.adjust_pace_vf(self.base_pace, self.grades)
-        preadjusted_times = np.multiply(self.get_distances(), preadjusted_paces)
-
-        self.optimal_paces, self.segment_times = self.adjust_paces_to_fit_target_time(preadjusted_paces, preadjusted_times)    
+            return (-7 * abs(grade) / 60)
+    
+    def generate_optimal_paces(self):
+        grades = self.get_grades()
+        adjustments = self.get_pace_adjustments_vf(grades)
+        self.base_pace = (self.target_time - np.dot(adjustments, self.get_distances())) / np.sum(self.get_distances())
+        self.optimal_paces = np.full(grades.shape, self.base_pace) + adjustments
+        self.segment_times = np.multiply(self.get_distances(), self.optimal_paces)
 
     @staticmethod
     def get_display_txt_for_pace(pace):
@@ -126,11 +107,7 @@ class PacingPlan:
             display_txt += f"{i}, {pace}, {lat}, {lon}, {elevation} \n"
         return display_txt
 
-    def __repr__(self, verbose=True):
-
-        #TODO: only let this be called if pacing plan has been generated
-        if verbose:
-            return self.gen_full_text()
+    def gen_abbrev_plan(self):
         display_txt = ""
 
         header = f'{self.race_course.course_name}: {self.target_time} minute plan'
@@ -152,6 +129,14 @@ class PacingPlan:
 
         return display_txt
 
+    def __repr__(self, verbose=False):
+        #TODO: only let this be called if pacing plan has been generated
+        if verbose:
+            return self.gen_full_text()
+        else:
+            return self.gen_abbrev_plan()
+        
+
 class PacingPlanDP(PacingPlan):
     def __init__(self,race_course : racecourse.RaceCourse, target_time, max_paces):
         super().__init__(race_course, target_time, max_paces)
@@ -160,14 +145,6 @@ class PacingPlanDP(PacingPlan):
         self.LOSS = np.ones((n, n+1, max_paces)) * np.inf
         self.OPT = np.ones((n, n+1, max_paces)).astype(int)*-1
     
-    # TODO: Optional function, returns the pace you run at segment i
-    def get_pace_for_idx(self, i):
-        raise NotImplementedError("get_pace_for_idx is not implemented")
-    
-    # TODO: Optional function, return pace you run at the [dist] point in the race. 
-    def get_pace_for_dist(self, dist):
-        raise NotImplementedError("")
-
     # TODO: optimize this using numpy functions
     # generates a complete array of paces that we run for every segment
     def gen_aggregate_paces(self):
@@ -226,7 +203,6 @@ class PacingPlanDP(PacingPlan):
                 weighted_pace = np.dot(self.optimal_paces[i:j], self.get_distances()[i:j] / sum(self.get_distances()[i:j]))
                 self.WP[i,j] = weighted_pace
                 self.LOSS[i,j,0] = np.sum(np.square(self.optimal_paces[i:j] - weighted_pace))
-                self.OPT[i,j,0] = -1 
 
         for a in range(1, self.max_paces):
             if verbose:

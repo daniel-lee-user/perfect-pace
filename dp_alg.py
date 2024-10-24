@@ -111,11 +111,26 @@ class PacingPlan:
         # return (f'{pace:.2f}')
         m, s = divmod(pace*60, 60)
         return (f'{m:.0f}:{int(s):02d}')
+    
+    def gen_full_text(self):
 
-    def __repr__(self):
+        display_txt = ""
+
+        for i in range(self.get_n_segments()):
+            seg = self.race_course.segments[i]
+            lat = seg.start_lat
+            lon = seg.start_lon
+            pace = self.agg_paces[i]
+            elevation = seg.start_ele
+        
+            display_txt += f"{i}, {pace}, {lat}, {lon}, {elevation} \n"
+        return display_txt
+
+    def __repr__(self, verbose=True):
 
         #TODO: only let this be called if pacing plan has been generated
-
+        if verbose:
+            return self.gen_full_text()
         display_txt = ""
 
         header = f'{self.race_course.course_name}: {self.target_time} minute plan'

@@ -3,6 +3,7 @@ import racecourse
 import matplotlib.pyplot as plt
 import sys 
 import os.path
+import json
 
 conversion = {
     'meters_to_miles': 0.0006213712,
@@ -96,7 +97,6 @@ class PacingPlan:
     def gen_full_text(self):
 
         display_txt = ""
-
         for i in range(self.get_n_segments()):
             seg = self.race_course.segments[i]
             lat = seg.start_lat
@@ -106,6 +106,51 @@ class PacingPlan:
         
             display_txt += f"{i}, {pace}, {lat}, {lon}, {elevation} \n"
         return display_txt
+    
+    def gen_geojson(self, file_path, loop):
+        # Initialize the base structure of the GeoJSON
+        geojson_data = {
+            "type": "FeatureCollection",
+            "features": []
+        }
+        
+        # Loop through each segment and create a new feature for each one
+        all_changes = self.changes
+        if(all_changes[len(all_changes)-1] != self.get_n_segments()-1):
+            all_changes = np.append(all_changes, self.get_n_segments()-1)
+        start_idx = all_changes[0]# assuming changes always starts at 0
+        for i in range(1, len(all_changes)):
+            all_segments = []
+            for j in range(start_idx, all_changes[i]+1):
+                all_segments.append(self.race_course.segments[j])
+            
+            pace = self.agg_paces[start_idx]
+            
+            coords = [[seg.start_lon, seg.start_lat, seg.start_ele] for seg in all_segments]
+            if(i == len(all_changes)-1 and loop):
+                # if last segment and loop is true
+                first_seg = self.race_course.segments[0]
+                coords.append([first_seg.start_lon, first_seg.start_lat, first_seg.start_ele])
+
+            # Create a feature for each segment
+            feature = {
+                "type": "Feature",
+                "geometry": {
+                    "type": "LineString",
+                    "coordinates": coords
+                },
+                "properties": {
+                    "pace": pace  # Add pace property
+                }
+            }
+            
+            # Append the feature to the features array in GeoJSON
+            geojson_data["features"].append(feature)
+            start_idx = all_changes[i]
+        with open(file_path, 'w') as geojson_file:
+            json.dump(geojson_data, geojson_file, indent=4)
+        return geojson_data
+
 
     def gen_abbrev_plan(self):
         display_txt = ""
@@ -270,6 +315,8 @@ def main():
     while (repeat == True):
 
         file_path = str(input("\nfile path for .gpx file:\t"))
+        
+        use_loop = bool(input("\nIs the course a loop? 0/1\t"))
 
         if len(file_path) == 0:
 
@@ -318,8 +365,10 @@ def main():
             print('\nRunning DP Algorithm\n')
             plan.handle_DP(verbose=True)
             pace_plot_file_path = directory+ plan_identifier + '.jpg'
+            geojson_file_path   = directory+ plan_identifier + '.json'
             pace_plan_file_path = directory+ plan_identifier + '.txt'
             plan.gen_pace_chart(pace_plot_file_path, include_optimal_paces=True, include_recommended_paces=True)
+            plan.gen_geojson(geojson_file_path, use_loop)
             
             with open(pace_plan_file_path, 'w') as f:
                 f.write(str(plan))

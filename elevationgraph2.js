@@ -621,11 +621,11 @@ L.Control.Elevation = L.Control.extend({
     _addData: function(d) {
         var geom = d && d.geometry && d.geometry;
         var i;
-        console.log(d)
+        //console.log(d)
         if (geom && d.properties.pace !== undefined) {
             switch (geom.type) {
                 case 'LineString':
-                    console.log(d.properties.pace);
+                    //console.log(d.properties.pace);
                     this._addGeoJSONDataPace(geom.coordinates, d.properties.pace);
                     break;
 
@@ -736,7 +736,7 @@ L.Control.Elevation = L.Control.extend({
     },
     
     _handleLayerMouseOut: function(evt) {
-        console.log("OUt");
+        //console.log("OUt");
         if (this._pointM) {
             this._pointM.style("visibility", "hidden");
         }

@@ -46,7 +46,7 @@ document.getElementById('fileInput').addEventListener('change', async function(e
             // Clear the file input value to allow re-uploading the same file
             event.target.value = '';
     
-            //window.location.href = 'map.html';
+            window.location.href = 'map.html';
         } else {
             // Proceed with modifying GeoJSON without fetched data
             modifyGeoJSON(geojson);
@@ -102,6 +102,7 @@ document.getElementById('fileInput').addEventListener('change', async function(e
             // If no paces, just initialize with random pace
             geojson.features.forEach(feature => {
                 feature.properties.pace = Math.floor(Math.random() * 5) + 1; // Random value between 1 and 5
+                feature.properties.color = '#00FF00';
             });
         }
     

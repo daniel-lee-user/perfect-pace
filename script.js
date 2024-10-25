@@ -99,7 +99,7 @@ document.getElementById('fileInput').addEventListener('change', async function(e
             // If no paces, just initialize with random pace
             geojson.features.forEach(feature => {
                 feature.properties.pace = Math.floor(Math.random() * 5) + 1; // Random value between 1 and 5
-                feature.properties.color = '#00FF00';
+                feature.properties.color = '#0000FF';
             });
         }
     

@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import sys 
 import os.path
 import json
+import argparse
 
 conversion = {
     'meters_to_miles': 0.0006213712,
@@ -308,15 +309,49 @@ class PacingPlanDP(PacingPlan):
         ax.set_title(f'{self.race_course.course_name} Pacing Plan')
         plt.savefig(file_path, bbox_inches='tight',dpi=300)
     
+def init_parser() -> argparse.ArgumentParser:
+    '''
+    Initializes the command line flag parser for this file.
+
+    Flags:
+
+    [REQUIRED]
+    -f, --file  ==> file path
+    -t, --time  ==> time in minutes to complete course
+    -p, --paces ==> total number of paces
+
+    [OPTIONAL]
+    -l, --loop      ==> if the course contains a loop
+    -s, --smoothen  ==> if the course should be smoothened
+    -r              ==> if a randomly generated course should be used
+    -h              ==> opens help menu
+    '''
+    
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-f", "--file", help="file path of the gpx file to be parsed", required=True)
+    parser.add_argument("-t", "--time", type=int, help="time to complete course in minutes", required=True)
+    parser.add_argument("-p", "--paces", type=int, help="the total number of paces", required=True)
+
+    parser.add_argument("-l", "--loop", action="store_true", help="include this flag if the course contains a loop")
+    parser.add_argument("-s", "--smoothen", action="store_true", help="include if the course should be smoothened (UNIMPLEMENTED)")
+    parser.add_argument("-r", action="store_true", help="include this flag if you want a random course")
+
+    return parser
+
 
 def main():
+    parser = init_parser()
+    args = parser.parse_args()
 
     repeat = True
     while (repeat == True):
 
-        file_path = str(input("\nfile path for .gpx file:\t"))
-        
-        use_loop = bool(input("\nIs the course a loop? 0/1\t"))
+        #file_path = str(input("\nfile path for .gpx file:\t"))
+        #use_loop = bool(input("\nIs the course a loop? 0/1\t"))
+
+        file_path = args.file
+        use_loop = args.loop
+        use_smoothing = args.smoothen
 
         if len(file_path) == 0:
 
@@ -329,7 +364,7 @@ def main():
 
         else:
             course_name = os.path.basename(file_path).split('.')[0]
-            use_smoothing = bool(input("\nUse Smoothing? 0/1\t\t"))
+            #use_smoothing = bool(input("\nUse Smoothing? 0/1\t\t"))
             course = racecourse.RealRaceCourse(course_name, file_path, use_smoothing)
 
         print(f'\n{str(course)}')
@@ -346,12 +381,15 @@ def main():
             print(plot_path)
             raise(e)
         
-        create_plan = bool(int(input('\ncreate pacing plan? 0/1\t\t')))
+        #create_plan = bool(int(input('\ncreate pacing plan? 0/1\t\t')))
+        create_plan = True
 
         if create_plan:
             print('\nCreating Pacing Plan\n')
-            target_time = float(input('target time (minutes):\t\t'))
-            max_paces = int(input('number of pace changes:\t\t'))
+            #target_time = float(input('target time (minutes):\t\t'))
+            #max_paces = int(input('number of pace changes:\t\t'))
+            target_time = args.time
+            max_paces = args.paces
         else:
             sys.exit(1)
 
@@ -359,7 +397,8 @@ def main():
 
         plan_identifier = f'{max_paces} paces {target_time:.0f} min {course.n_segments} segs'
 
-        run_DP = bool(int(input('\nrun DP? 0/1\t\t\t')))
+        #run_DP = bool(int(input('\nrun DP? 0/1\t\t\t')))
+        run_DP = True
 
         if run_DP:
             print('\nRunning DP Algorithm\n')

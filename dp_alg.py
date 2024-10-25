@@ -343,6 +343,9 @@ def main():
     parser = init_parser()
     args = parser.parse_args()
 
+    if (args.s or args.r):
+        raise RuntimeError("These flags aren't implemented")
+
     repeat = True
     while (repeat == True):
 
@@ -353,7 +356,7 @@ def main():
         use_loop = args.loop
         use_smoothing = args.smoothen
 
-        if len(file_path) == 0:
+        if len(file_path) == 0 or args.r:
 
             print("\nGenerating Random Course\n")
             n_segments = int(input('n_segments: \t\t\t'))

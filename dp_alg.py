@@ -248,19 +248,19 @@ class PacingPlanDP(PacingPlan):
             for j in range(i+1, n+1):
                 weighted_pace = np.dot(self.optimal_paces[i:j], self.get_distances()[i:j] / sum(self.get_distances()[i:j]))
                 self.WP[i,j] = weighted_pace
-                self.LOSS[i,j,0] = np.sum(np.square(self.optimal_paces[i:j] - weighted_pace))
-
+                self.LOSS[i,j,0] = np.sum(self.optimal_paces[i:j] - weighted_pace)
+        MIN_SEGMENT_LENGTH = 5
         for a in range(1, self.max_paces):
             if verbose:
                 print(f'PROGRESSED TO A = {a}')
             for i in range(n):
                 # k >= i + number of pace changes + 1 
-                for k in range(i+a+1, n+1):
-                    j = i+1
+                for k in range(i+(a+1)*MIN_SEGMENT_LENGTH, n+1):
+                    j = i+MIN_SEGMENT_LENGTH
                     best_j = j 
-                    lowest_loss = self.LOSS[i,i+1,0] + self.LOSS[j,k,a-1]
+                    lowest_loss = self.LOSS[i,j,0] + self.LOSS[j,k,a-1]
                     
-                    for j in range(i+1,k):
+                    for j in range(i+MIN_SEGMENT_LENGTH,k - MIN_SEGMENT_LENGTH + 1):
                         loss = self.LOSS[i,j,0] + self.LOSS[j,k,a-1]
                         if loss < lowest_loss:
                             lowest_loss = loss
@@ -343,8 +343,7 @@ def main():
     parser = init_parser()
     args = parser.parse_args()
 
-    if (args.s or args.r):
-        raise RuntimeError("These flags aren't implemented")
+
 
     repeat = True
     while (repeat == True):
@@ -390,7 +389,7 @@ def main():
         if create_plan:
             print('\nCreating Pacing Plan\n')
             #target_time = float(input('target time (minutes):\t\t'))
-            #max_paces = int(input('number of pace changes:\t\t'))
+            #max_paces = int(input('number of paces:\t\t'))
             target_time = args.time
             max_paces = args.paces
         else:

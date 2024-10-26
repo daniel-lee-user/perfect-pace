@@ -247,6 +247,9 @@ class PacingPlanDP(PacingPlan):
 
         if self.max_paces <= self.precomputed_pace:
             return
+        else:
+            self.LOSS = np.ones((n, n+1, self.max_paces)) * np.inf
+            self.OPT = np.ones((n, n+1, self.max_paces)).astype(int)*-1
         
         if self.precomputed_pace == 0:
             for i in range(n):
@@ -277,6 +280,8 @@ class PacingPlanDP(PacingPlan):
         
         self.precomputed_pace = max(self.precomputed_pace, self.max_paces)
 
+    def change_max_paces(self):
+        pass
     def handle_DP(self, verbose):
         self.calculate_DP(verbose)
         self.backtrack_solution(verbose)
@@ -351,7 +356,8 @@ def main():
     parser = init_parser()
     args = parser.parse_args()
 
-
+    if args.r or args.smoothen:
+        raise RuntimeError("unimplemented")
 
     repeat = True
     while (repeat == True):

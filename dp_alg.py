@@ -40,8 +40,24 @@ class PacingPlan:
     
     def get_n_segments(self):
         return self.race_course.n_segments
-        
-    def get_elapsed_time_of_plan(self, verbose=True):
+
+    """Returns amount that we change the pace in minutes / mile for a given elevation grade using
+    Jack Daniels formula"""
+    @staticmethod
+    def get_pace_adjustment(grade):
+        if grade > 0:
+            return (12 * abs(grade) / 60)
+        else:
+            return (-7 * abs(grade) / 60)
+    
+    def generate_optimal_paces(self):
+        grades = self.get_grades()
+        adjustments = self.get_pace_adjustments_vf(grades)
+        self.base_pace = (self.target_time - np.dot(adjustments, self.get_distances())) / np.sum(self.get_distances())
+        self.optimal_paces = np.full(grades.shape, self.base_pace) + adjustments
+        self.optimal_segment_times = np.multiply(self.get_distances(), self.optimal_paces)
+
+    def compute_true_time(self, verbose=True):
         n = self.get_n_segments()
         times = []
         dists = []
@@ -68,26 +84,15 @@ class PacingPlan:
             dists += [elapsed_dist]
 
         self.elapsed_dists = dists
-        self.segment_times = times
+        self.true_segment_times = times
 
         self.true_time = sum(times)
-        return self.true_time
 
-    """Returns amount that we change the pace in minutes / mile for a given elevation grade using
-    Jack Daniels formula"""
-    @staticmethod
-    def get_pace_adjustment(grade):
-        if grade > 0:
-            return (12 * abs(grade) / 60)
-        else:
-            return (-7 * abs(grade) / 60)
-    
-    def generate_optimal_paces(self):
-        grades = self.get_grades()
-        adjustments = self.get_pace_adjustments_vf(grades)
-        self.base_pace = (self.target_time - np.dot(adjustments, self.get_distances())) / np.sum(self.get_distances())
-        self.optimal_paces = np.full(grades.shape, self.base_pace) + adjustments
-        self.segment_times = np.multiply(self.get_distances(), self.optimal_paces)
+    def get_true_time(self):
+        if self.true_time is None:
+            self.compute_true_time()
+
+        return self.true_time
 
     @staticmethod
     def get_display_txt_for_pace(pace):
@@ -95,6 +100,7 @@ class PacingPlan:
         m, s = divmod(pace*60, 60)
         return (f'{m:.0f}:{int(s):02d}')
     
+    """Generates a .txt pacing plan that explicitly statements the pace run at every segment"""
     def gen_full_text(self):
 
         display_txt = ""
@@ -152,14 +158,14 @@ class PacingPlan:
             json.dump(geojson_data, geojson_file, indent=4)
         return geojson_data
 
-
+    """Generates a simplified .txt pacing plan that includes just the different pace segments"""
     def gen_abbrev_plan(self):
         display_txt = ""
 
         header = f'{self.race_course.course_name}: {self.target_time} minute plan'
         display_txt += header + '\n\n'
 
-        total_time = self.get_elapsed_time_of_plan(verbose=False)
+        total_time = self.get_true_time()
 
         for i, pace in enumerate(self.recommended_paces):
             lat_lon_txt = ''
@@ -182,7 +188,6 @@ class PacingPlan:
         else:
             return self.gen_abbrev_plan()
         
-
 class PacingPlanDP(PacingPlan):
     def __init__(self,race_course : racecourse.RaceCourse, target_time, total_paces):
         super().__init__(race_course, target_time, total_paces)
@@ -224,7 +229,7 @@ class PacingPlanDP(PacingPlan):
         n = self.get_n_segments()
 
         # list of segment indices where we change the paces
-        self.changes = np.array(sorted(self.get_idxs(0,n, self.total_paces-1, verbose=False))).astype(int)
+        self.changes = np.array(sorted(self.get_idxs(0,n, self.total_paces-1))).astype(int)
 
         # TODO: Remove assertionerror
         if len(self.changes) != self.total_paces:
@@ -251,9 +256,8 @@ class PacingPlanDP(PacingPlan):
         if self.max_cached_paces == 0:
             for i in range(n):
                 for j in range(i+1, n+1):
-                    weighted_pace = np.dot(self.optimal_paces[i:j], self.get_distances()[i:j] / sum(self.get_distances()[i:j]))
-                    self.WP[i,j] = weighted_pace
-                    self.LOSS[i,j,0] = np.sum(self.optimal_paces[i:j] - weighted_pace)
+                    self.WP[i,j] = np.dot(self.optimal_paces[i:j], self.get_distances()[i:j] / sum(self.get_distances()[i:j]))
+                    self.LOSS[i,j,0] = np.sum(self.optimal_paces[i:j] - self.WP[i,j])
                 
         MIN_SEGMENT_LENGTH = 5
 
@@ -289,7 +293,7 @@ class PacingPlanDP(PacingPlan):
         self.calculate_DP(verbose)
         self.backtrack_solution()
         self.gen_aggregate_paces()
-        self.get_elapsed_time_of_plan() # generates elapsed time as well
+        # self.get_true_time()
 
     def gen_pace_chart(self,file_path, include_optimal_paces=False, include_recommended_paces=True):
         if not include_optimal_paces and not include_recommended_paces:
@@ -361,94 +365,67 @@ def main():
     if args.r or args.smoothen:
         raise RuntimeError("unimplemented")
 
+    file_path = args.file
+    use_loop = args.loop
+    use_smoothing = args.smoothen
+
+    if len(file_path) == 0 or args.r:
+
+        print("\nGenerating Random Course\n")
+        n_segments = int(input('n_segments: \t\t\t'))
+        distance = float(input('distance (miles): \t\t'))
+        course_name = f'random {distance:.1f}'
+        course = racecourse.RandomRaceCourse(course_name, n_segments, distance, use_smoothing=True)
+        file_path = 'data/random/'
+
+    else:
+        course_name = os.path.basename(file_path).split('.')[0]
+        course = racecourse.RealRaceCourse(course_name, file_path, use_smoothing)
+
+    print(f'\n{str(course)}')
+
+    directory = os.path.dirname(file_path)+'/'+course_name +'/'
+    if not os.path.exists(directory):
+        os.makedirs(directory)
+
+    plot_path = directory+f'{course_name} {course.n_segments} segs.jpg'
+
+    try:
+        course.gen_course_plot(plot_path)
+    except Exception as e:
+        print(plot_path)
+        raise(e)
+    
+    print('\nCreating Pacing Plan\n')
+    target_time = args.time
+    total_paces = args.paces
+    plan = PacingPlanDP(course, target_time, total_paces)
+
     repeat = True
-    while (repeat == True):
+    is_first_iter = True
 
-        #file_path = str(input("\nfile path for .gpx file:\t"))
-        #use_loop = bool(input("\nIs the course a loop? 0/1\t"))
+    while repeat:
 
-        file_path = args.file
-        use_loop = args.loop
-        use_smoothing = args.smoothen
-
-        if len(file_path) == 0 or args.r:
-
-            print("\nGenerating Random Course\n")
-            n_segments = int(input('n_segments: \t\t\t'))
-            distance = float(input('distance (miles): \t\t'))
-            course_name = f'random {distance:.1f}'
-            course = racecourse.RandomRaceCourse(course_name, n_segments, distance, use_smoothing=True)
-            file_path = 'data/random/'
-
-        else:
-            course_name = os.path.basename(file_path).split('.')[0]
-            #use_smoothing = bool(input("\nUse Smoothing? 0/1\t\t"))
-            course = racecourse.RealRaceCourse(course_name, file_path, use_smoothing)
-
-        print(f'\n{str(course)}')
-
-        directory = os.path.dirname(file_path)+'/'+course_name +'/'
-        if not os.path.exists(directory):
-            os.makedirs(directory)
-
-        plot_path = directory+f'{course_name} {course.n_segments} segs.jpg'
-
-        try:
-            course.gen_course_plot(plot_path)
-        except Exception as e:
-            print(plot_path)
-            raise(e)
-        
-        #create_plan = bool(int(input('\ncreate pacing plan? 0/1\t\t')))
-        create_plan = True
-
-        if create_plan:
-            print('\nCreating Pacing Plan\n')
-            #target_time = float(input('target time (minutes):\t\t'))
-            #total_paces = int(input('number of paces:\t\t'))
-            target_time = args.time
-            total_paces = args.paces
-        else:
-            sys.exit(1)
-
-        plan = PacingPlanDP(course, target_time, total_paces)
-
-        plan_identifier = f'{total_paces} paces {target_time:.0f} min {course.n_segments} segs'
-
-        #run_DP = bool(int(input('\nrun DP? 0/1\t\t\t')))
-        run_DP = True
-
-        if run_DP:
-            print('\nRunning DP Algorithm\n')
-            plan.handle_DP(verbose=True)
-            pace_plot_file_path = directory+ plan_identifier + '.jpg'
-            geojson_file_path   = directory+ plan_identifier + '.json'
-            pace_plan_file_path = directory+ plan_identifier + '.txt'
-            plan.gen_pace_chart(pace_plot_file_path, include_optimal_paces=True, include_recommended_paces=True)
-            plan.gen_geojson(geojson_file_path, use_loop)
-            
-            with open(pace_plan_file_path, 'w') as f:
-                f.write(str(plan))
-
-        repeat = bool(int(input('\nCreate another pace plan? 0/1\t')))
-        
-        while repeat:
+        if not is_first_iter:
             new_paces = input("\nInput number of paces: ")
             plan.change_total_paces(int(new_paces))
             total_paces = new_paces
-            plan_identifier = f'{total_paces} paces {target_time:.0f} min {course.n_segments} segs'
-            print('\nRunning DP Algorithm\n')
-            plan.handle_DP(verbose=True)
-            pace_plot_file_path = directory+ plan_identifier + '.jpg'
-            geojson_file_path   = directory+ plan_identifier + '.json'
-            pace_plan_file_path = directory+ plan_identifier + '.txt'
-            plan.gen_pace_chart(pace_plot_file_path, include_optimal_paces=True, include_recommended_paces=True)
-            plan.gen_geojson(geojson_file_path, use_loop)
-            
-            with open(pace_plan_file_path, 'w') as f:
-                f.write(str(plan))
+        
+        plan_identifier = f'{total_paces} paces {target_time:.0f} min {course.n_segments} segs'
 
-            repeat = bool(int(input('\nCreate another pace plan? 0/1\t')))
+        print('\nRunning DP Algorithm\n')
+        plan.handle_DP(verbose=True)
+        pace_plot_file_path = directory+ plan_identifier + '.jpg'
+        geojson_file_path   = directory+ plan_identifier + '.json'
+        pace_plan_file_path = directory+ plan_identifier + '.txt'
+        plan.gen_pace_chart(pace_plot_file_path, include_optimal_paces=True, include_recommended_paces=True)
+        plan.gen_geojson(geojson_file_path, use_loop)
+        
+        with open(pace_plan_file_path, 'w') as f:
+            f.write(str(plan))
+
+        repeat = bool(int(input('\nCreate another pace plan? 0/1\t')))
+        is_first_iter = False
         
 if __name__ == '__main__':
     main()

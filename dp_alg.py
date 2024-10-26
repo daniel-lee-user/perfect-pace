@@ -25,11 +25,11 @@ conversion = {
 
 class PacingPlan:
 
-    def __init__(self,race_course : racecourse.RaceCourse, target_time, max_paces):
+    def __init__(self,race_course : racecourse.RaceCourse, target_time, total_paces):
         self.get_pace_adjustments_vf = np.vectorize(PacingPlan.get_pace_adjustment)
         self.target_time = target_time
         self.race_course = race_course
-        self.max_paces = max_paces
+        self.total_paces = total_paces
         self.generate_optimal_paces()
 
     def get_grades(self):
@@ -184,20 +184,20 @@ class PacingPlan:
         
 
 class PacingPlanDP(PacingPlan):
-    def __init__(self,race_course : racecourse.RaceCourse, target_time, max_paces):
-        super().__init__(race_course, target_time, max_paces)
+    def __init__(self,race_course : racecourse.RaceCourse, target_time, total_paces):
+        super().__init__(race_course, target_time, total_paces)
         n = self.get_n_segments()
         self.WP = np.zeros((n,n+1))
-        self.LOSS = np.ones((n, n+1, max_paces)) * np.inf
-        self.OPT = np.ones((n, n+1, max_paces)).astype(int)*-1
-        self.precomputed_pace = 0
+        self.LOSS = np.ones((n, n+1, total_paces)) * np.inf
+        self.OPT = np.ones((n, n+1, total_paces)).astype(int)*-1
+        self.max_cached_paces = 0
     
     # TODO: optimize this using numpy functions
     # generates a complete array of paces that we run for every segment
     def gen_aggregate_paces(self):
         agg_paces = []
         for i in range(len(self.changes)):
-            if i == self.max_paces - 1:
+            if i == self.total_paces - 1:
                 high = self.get_n_segments()
             else:
                 high = self.changes[i+1]
@@ -208,7 +208,7 @@ class PacingPlanDP(PacingPlan):
 
     """Returns the set of indices that represent the segments we change pace on for a pacing plan 
     for interval [i,k) with [a] pace changes remaining """
-    def get_idxs(self,i,k,a, verbose=True):
+    def get_idxs(self,i,k,a, verbose=False):
         if verbose:
             print(f"range [{i},{k}) with {a} pace changes")
         if a == 0:
@@ -220,20 +220,20 @@ class PacingPlanDP(PacingPlan):
         right.add(i)
         return right
     
-    def backtrack_solution(self, verbose=True):
+    def backtrack_solution(self):
         n = self.get_n_segments()
 
         # list of segment indices where we change the paces
-        self.changes = np.array(sorted(self.get_idxs(0,n, self.max_paces-1, verbose))).astype(int)
+        self.changes = np.array(sorted(self.get_idxs(0,n, self.total_paces-1, verbose=False))).astype(int)
 
         # TODO: Remove assertionerror
-        if len(self.changes) != self.max_paces:
-            raise AssertionError('Number of pace changes computed is not equal to max_paces')
+        if len(self.changes) != self.total_paces:
+            raise AssertionError('Number of pace changes computed is not equal to total_paces')
 
         # list of pace changes (i.e. [5,7,6.5] means we run 5 min/mile at segment 0 )
         paces = []
 
-        for j in range(self.max_paces-1):
+        for j in range(self.total_paces-1):
             i1 = self.changes[j]
             i2 = self.changes[j+1]
             paces.append(self.WP[i1,i2])
@@ -245,13 +245,10 @@ class PacingPlanDP(PacingPlan):
     def calculate_DP(self, verbose=True):
         n = self.get_n_segments()
 
-        if self.max_paces <= self.precomputed_pace:
+        if self.total_paces <= self.max_cached_paces:
             return
-        else:
-            self.LOSS = np.ones((n, n+1, self.max_paces)) * np.inf
-            self.OPT = np.ones((n, n+1, self.max_paces)).astype(int)*-1
         
-        if self.precomputed_pace == 0:
+        if self.max_cached_paces == 0:
             for i in range(n):
                 for j in range(i+1, n+1):
                     weighted_pace = np.dot(self.optimal_paces[i:j], self.get_distances()[i:j] / sum(self.get_distances()[i:j]))
@@ -259,7 +256,8 @@ class PacingPlanDP(PacingPlan):
                     self.LOSS[i,j,0] = np.sum(self.optimal_paces[i:j] - weighted_pace)
                 
         MIN_SEGMENT_LENGTH = 5
-        for a in range(1, self.max_paces):
+
+        for a in range(max(1, self.max_cached_paces), self.total_paces):
             if verbose:
                 print(f'PROGRESSED TO A = {a}')
             for i in range(n):
@@ -278,13 +276,18 @@ class PacingPlanDP(PacingPlan):
                     self.LOSS[i,k,a] = lowest_loss
                     self.OPT[i,k,a] = int(best_j)
         
-        self.precomputed_pace = max(self.precomputed_pace, self.max_paces)
+        self.max_cached_paces = self.total_paces
 
-    def change_max_paces(self):
-        pass
+    def change_total_paces(self, new_total_paces):
+        if new_total_paces > self.total_paces:
+            self.LOSS = np.pad(self.LOSS, ((0,0), (0,0), (0,new_total_paces-self.total_paces)), 'constant', constant_values=np.inf)
+            self.OPT = np.pad(self.OPT, ((0,0), (0,0), (0,new_total_paces-self.total_paces)), 'constant', constant_values=-1)
+
+        self.total_paces = new_total_paces
+
     def handle_DP(self, verbose):
         self.calculate_DP(verbose)
-        self.backtrack_solution(verbose)
+        self.backtrack_solution()
         self.gen_aggregate_paces()
         self.get_elapsed_time_of_plan() # generates elapsed time as well
 
@@ -351,7 +354,6 @@ def init_parser() -> argparse.ArgumentParser:
 
     return parser
 
-
 def main():
     parser = init_parser()
     args = parser.parse_args()
@@ -403,15 +405,15 @@ def main():
         if create_plan:
             print('\nCreating Pacing Plan\n')
             #target_time = float(input('target time (minutes):\t\t'))
-            #max_paces = int(input('number of paces:\t\t'))
+            #total_paces = int(input('number of paces:\t\t'))
             target_time = args.time
-            max_paces = args.paces
+            total_paces = args.paces
         else:
             sys.exit(1)
 
-        plan = PacingPlanDP(course, target_time, max_paces)
+        plan = PacingPlanDP(course, target_time, total_paces)
 
-        plan_identifier = f'{max_paces} paces {target_time:.0f} min {course.n_segments} segs'
+        plan_identifier = f'{total_paces} paces {target_time:.0f} min {course.n_segments} segs'
 
         #run_DP = bool(int(input('\nrun DP? 0/1\t\t\t')))
         run_DP = True
@@ -429,11 +431,12 @@ def main():
                 f.write(str(plan))
 
         repeat = bool(int(input('\nCreate another pace plan? 0/1\t')))
+        
         while repeat:
             new_paces = input("\nInput number of paces: ")
-            plan.max_paces = int(new_paces)
-            max_paces = new_paces
-            plan_identifier = f'{max_paces} paces {target_time:.0f} min {course.n_segments} segs'
+            plan.change_total_paces(int(new_paces))
+            total_paces = new_paces
+            plan_identifier = f'{total_paces} paces {target_time:.0f} min {course.n_segments} segs'
             print('\nRunning DP Algorithm\n')
             plan.handle_DP(verbose=True)
             pace_plot_file_path = directory+ plan_identifier + '.jpg'

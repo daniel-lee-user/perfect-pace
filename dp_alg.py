@@ -190,6 +190,7 @@ class PacingPlanDP(PacingPlan):
         self.WP = np.zeros((n,n+1))
         self.LOSS = np.ones((n, n+1, max_paces)) * np.inf
         self.OPT = np.ones((n, n+1, max_paces)).astype(int)*-1
+        self.precomputed_pace = 0
     
     # TODO: optimize this using numpy functions
     # generates a complete array of paces that we run for every segment
@@ -244,11 +245,16 @@ class PacingPlanDP(PacingPlan):
     def calculate_DP(self, verbose=True):
         n = self.get_n_segments()
 
-        for i in range(n):
-            for j in range(i+1, n+1):
-                weighted_pace = np.dot(self.optimal_paces[i:j], self.get_distances()[i:j] / sum(self.get_distances()[i:j]))
-                self.WP[i,j] = weighted_pace
-                self.LOSS[i,j,0] = np.sum(self.optimal_paces[i:j] - weighted_pace)
+        if self.max_paces <= self.precomputed_pace:
+            return
+        
+        if self.precomputed_pace == 0:
+            for i in range(n):
+                for j in range(i+1, n+1):
+                    weighted_pace = np.dot(self.optimal_paces[i:j], self.get_distances()[i:j] / sum(self.get_distances()[i:j]))
+                    self.WP[i,j] = weighted_pace
+                    self.LOSS[i,j,0] = np.sum(self.optimal_paces[i:j] - weighted_pace)
+                
         MIN_SEGMENT_LENGTH = 5
         for a in range(1, self.max_paces):
             if verbose:
@@ -268,6 +274,8 @@ class PacingPlanDP(PacingPlan):
                     
                     self.LOSS[i,k,a] = lowest_loss
                     self.OPT[i,k,a] = int(best_j)
+        
+        self.precomputed_pace = max(self.precomputed_pace, self.max_paces)
 
     def handle_DP(self, verbose):
         self.calculate_DP(verbose)
@@ -415,6 +423,23 @@ def main():
                 f.write(str(plan))
 
         repeat = bool(int(input('\nCreate another pace plan? 0/1\t')))
+        while repeat:
+            new_paces = input("\nInput number of paces: ")
+            plan.max_paces = int(new_paces)
+            max_paces = new_paces
+            plan_identifier = f'{max_paces} paces {target_time:.0f} min {course.n_segments} segs'
+            print('\nRunning DP Algorithm\n')
+            plan.handle_DP(verbose=True)
+            pace_plot_file_path = directory+ plan_identifier + '.jpg'
+            geojson_file_path   = directory+ plan_identifier + '.json'
+            pace_plan_file_path = directory+ plan_identifier + '.txt'
+            plan.gen_pace_chart(pace_plot_file_path, include_optimal_paces=True, include_recommended_paces=True)
+            plan.gen_geojson(geojson_file_path, use_loop)
+            
+            with open(pace_plan_file_path, 'w') as f:
+                f.write(str(plan))
+
+            repeat = bool(int(input('\nCreate another pace plan? 0/1\t')))
         
 if __name__ == '__main__':
     main()

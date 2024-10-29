@@ -1,7 +1,6 @@
 import numpy as np
 import racecourse
 import matplotlib.pyplot as plt
-import sys 
 import os.path
 import json
 import argparse
@@ -29,10 +28,26 @@ class PacingPlan:
         self.get_pace_adjustments_vf = np.vectorize(PacingPlan.get_pace_adjustment)
         self.target_time = target_time
         self.race_course = race_course
-        self.total_paces = total_paces
+        self.current_m_paces = total_paces
+
+        # generate_optimal_paces
+        self.base_pace = None
+        self.optimal_paces = None
+        self.optimal_seg_times = None
+
+        # Pace Recommendation algorithm
+        self.critical_segments = None
+        self.true_paces_abbrev = None
+
+        # gen_aggregate_paces
+        self.true_paces_full = None
+
+        # compute_true_time
+        self.elapsed_dists = None
+        self.true_seg_times = None
+        self.true_total_time = None
+
         self.generate_optimal_paces()
-        self.true_time = None
-        self.max_cached_paces = 0
 
     def get_grades(self):
         return self.race_course.grades
@@ -57,22 +72,21 @@ class PacingPlan:
         adjustments = self.get_pace_adjustments_vf(grades)
         self.base_pace = (self.target_time - np.dot(adjustments, self.get_distances())) / np.sum(self.get_distances())
         self.optimal_paces = np.full(grades.shape, self.base_pace) + adjustments
-        self.optimal_segment_times = np.multiply(self.get_distances(), self.optimal_paces)
+        self.optimal_seg_times = np.multiply(self.get_distances(), self.optimal_paces)
 
-        # TODO: optimize this using numpy functions
-    
+    # TODO: optimize this using numpy functions
     # generates a complete array of paces that we run for every segment
-    def gen_aggregate_paces(self):
-        agg_paces = []
-        for i in range(len(self.changes)):
-            if i == self.total_paces - 1:
+    def gen_full_paces(self):
+        full_paces = []
+        for i in range(len(self.critical_segments)):
+            if i == self.current_m_paces - 1:
                 high = self.get_n_segments()
             else:
-                high = self.changes[i+1]
-            num_copies = high - self.changes[i]
-            to_add = [self.recommended_paces[i]]*num_copies
-            agg_paces += to_add
-        self.agg_paces = np.array(agg_paces)        
+                high = self.critical_segments[i+1]
+            num_copies = high - self.critical_segments[i]
+            paces_to_add = [self.true_paces_abbrev[i]]*num_copies
+            full_paces += paces_to_add
+        self.true_paces_full = np.array(full_paces)        
 
     """
     populates self.elapsed_dists, self.true_segment_times, self.true_time
@@ -82,35 +96,34 @@ class PacingPlan:
         times = []
         dists = []
 
-        for i, pace in enumerate(self.recommended_paces):
-            if i == len(self.recommended_paces) - 1:
+        for i, pace in enumerate(self.true_paces_abbrev):
+            if i == len(self.true_paces_abbrev) - 1:
                 end_seg = n-1
             else:
-                end_seg = self.changes[i+1] - 1
-            end_dist = self.race_course.end_distance[end_seg]
+                end_seg = self.critical_segments[i+1] - 1
+            end_dist = self.race_course.end_distances[end_seg]
 
             if i == 0:
                 start_dist = 0
             else:
-                start_seg = self.changes[i]
-                start_dist = self.race_course.end_distance[start_seg-1]
+                start_seg = self.critical_segments[i]
+                start_dist = self.race_course.end_distances[start_seg-1]
             
             elapsed_dist = end_dist - start_dist
             
             time = pace*elapsed_dist
             if verbose == True:
-                print(f'segment range [{self.changes[i]}, {end_seg+1}] has dist {elapsed_dist:.2f}')
+                print(f'segment range [{self.critical_segments[i]}, {end_seg+1}] has dist {elapsed_dist:.2f}')
                 print(f'run at {pace:.2f} min / mile for {time:.2f} minutes')
             times += [time]
             dists += [elapsed_dist]
 
         self.elapsed_dists = dists
-        self.true_segment_times = times
-        self.true_time = sum(times)
+        self.true_seg_times = times
+        self.true_total_time = sum(times)
 
     @staticmethod
     def get_display_txt_for_pace(pace):
-        # return (f'{pace:.2f}')
         m, s = divmod(pace*60, 60)
         return (f'{m:.0f}:{int(s):02d}')
     
@@ -122,10 +135,10 @@ class PacingPlan:
             seg = self.race_course.segments[i]
             lat = seg.start_lat
             lon = seg.start_lon
-            pace = self.agg_paces[i]
+            pace = self.true_paces_full[i]
             dist = self.race_course.distances[i]
             time = pace * dist
-            elevation = seg.start_ele
+            elevation = self.race_course.elevations[i] # feet
         
             display_txt += f"{i}, {pace}, {lat}, {lon}, {elevation}, {dist}, {time} \n"
         return display_txt
@@ -138,16 +151,16 @@ class PacingPlan:
         }
         
         # Loop through each segment and create a new feature for each one
-        all_changes = self.changes
+        all_changes = self.critical_segments
         if(all_changes[len(all_changes)-1] != self.get_n_segments()-1):
             all_changes = np.append(all_changes, self.get_n_segments()-1)
-        start_idx = all_changes[0]# assuming changes always starts at 0
+        start_idx = all_changes[0] # assuming changes always starts at 0
         for i in range(1, len(all_changes)):
             all_segments = []
             for j in range(start_idx, all_changes[i]+1):
                 all_segments.append(self.race_course.segments[j])
             
-            pace = self.agg_paces[start_idx]
+            pace = self.true_paces_full[start_idx]
             
             coords = [[seg.start_lon, seg.start_lat, seg.start_ele] for seg in all_segments]
             if(i == len(all_changes)-1 and loop):
@@ -181,36 +194,70 @@ class PacingPlan:
         header = f'{self.race_course.course_name}: {self.target_time} minute plan'
         display_txt += header + '\n\n'
 
-        total_time = self.true_time 
-
-        for i, pace in enumerate(self.recommended_paces):
+        for i, pace in enumerate(self.true_paces_abbrev):
             lat_lon_txt = ''
             if self.race_course is type(racecourse.RealRaceCourse):
                 seg = self.race_course.segments[i]
                 lat_lon_txt = f' @ ({seg.start_lat},{seg.start_lon})'
             distance_duration = self.elapsed_dists[i]
-            start_distance = self.race_course.start_distance[self.changes[i]]
+            start_distance = self.race_course.start_distances[self.critical_segments[i]]
             txt = f"{i}: {start_distance:.2f} mi\t{self.get_display_txt_for_pace(pace)}/mile for {distance_duration:.2f} mi{lat_lon_txt}"
             display_txt += txt + '\n'
         
-        display_txt += f"\nTotal time: {total_time:.2f}"
+        display_txt += f"\nTotal time: {self.true_total_time :.2f}"
 
         return display_txt
+    
+    def gen_pace_chart(self,file_path, incl_opt_paces=False, incl_true_paces=True):
+        if not incl_opt_paces and not incl_true_paces:
+            raise ValueError("at least one of incl_opt_paces or incl_true_paces must be True")
 
-    def __repr__(self, verbose=False):
+        fig,ax = plt.subplots()
+        fig.set_figwidth(20)
+
+        x = np.insert(self.race_course.end_distances, 0,0)
+        y_elevations = np.append(self.race_course.elevations, self.race_course.end_elevations[-1])
+        ax.plot(x, y_elevations, label ='elevation', color='blue')
+
+        ax.set_xlabel('distance (miles)')
+        ax.set_ylabel('elevation (feet)')
+        ax.legend(loc="upper left")
+
+        ax2 = ax.twinx()
+        ax2.set_ylabel('pace (min/mile)')
+
+        if incl_opt_paces:
+            y_optimal_paces = np.append(self.optimal_paces, self.optimal_paces[-1])
+            ax2.step(x, y_optimal_paces, label='optimal paces', color='orange', alpha=0.4, where='post')
+
+        if incl_true_paces:
+            y_true_paces = np.append(self.true_paces_full, self.true_paces_full[-1])
+            ax2.step(x, y_true_paces, label='recommended paces', color='red', where='post')
+
+            for i, xy in enumerate(zip(x, self.true_paces_full)):
+                if i in self.critical_segments:
+                    pace = self.true_paces_full[i]
+                    ax2.annotate(f'{self.get_display_txt_for_pace(pace)}', xy, xytext=(10,10), textcoords='offset pixels')
+
+        ax.set_title(f'{self.race_course.course_name} Pacing Plan')
+        plt.savefig(file_path, bbox_inches='tight',dpi=300)
+    
+    def __repr__(self, verbose=True):
         #TODO: only let this be called if pacing plan has been generated
         if verbose:
             return self.gen_full_text()
         else:
             return self.gen_abbrev_plan()
         
-class PacingPlanDP(PacingPlan):
+class PacingPlanBruteForce(PacingPlan):
     def __init__(self,race_course : racecourse.RaceCourse, target_time, total_paces):
         super().__init__(race_course, target_time, total_paces)
         n = self.get_n_segments()
         self.WP = np.zeros((n,n+1))
         self.LOSS = np.ones((n, n+1, total_paces)) * np.inf
         self.OPT = np.ones((n, n+1, total_paces)).astype(int)*-1
+        self.cached_m_paces = 0
+
 
     """Returns the set of indices that represent the segments we change pace on for a pacing plan 
     for interval [i,k) with [a] pace changes remaining """
@@ -230,31 +277,31 @@ class PacingPlanDP(PacingPlan):
         n = self.get_n_segments()
 
         # list of segment indices where we change the paces
-        self.changes = np.array(sorted(self.get_idxs(0,n, self.total_paces-1))).astype(int)
+        self.critical_segments = np.array(sorted(self.get_idxs(0,n, self.current_m_paces-1))).astype(int)
 
         # TODO: Remove assertionerror
-        if len(self.changes) != self.total_paces:
+        if len(self.critical_segments) != self.current_m_paces:
             raise AssertionError('Number of pace changes computed is not equal to total_paces')
 
         # list of pace changes (i.e. [5,7,6.5] means we run 5 min/mile at segment 0 )
         paces = []
 
-        for j in range(self.total_paces-1):
-            i1 = self.changes[j]
-            i2 = self.changes[j+1]
+        for j in range(self.current_m_paces-1):
+            i1 = self.critical_segments[j]
+            i2 = self.critical_segments[j+1]
             paces.append(self.WP[i1,i2])
         
-        paces.append(self.WP[int(self.changes[-1]), n])
+        paces.append(self.WP[int(self.critical_segments[-1]), n])
 
-        self.recommended_paces = np.array(paces)
+        self.true_paces_abbrev = np.array(paces)
 
-    def calculate_DP(self, verbose=True):
+    def calculate_brute_force(self, verbose=True):
         n = self.get_n_segments()
 
-        if self.total_paces <= self.max_cached_paces:
+        if self.current_m_paces <= self.cached_m_paces:
             return
         
-        if self.max_cached_paces == 0:
+        if self.cached_m_paces == 0:
             for i in range(n):
                 for j in range(i+1, n+1):
                     self.WP[i,j] = np.dot(self.optimal_paces[i:j], self.get_distances()[i:j] / sum(self.get_distances()[i:j]))
@@ -262,7 +309,7 @@ class PacingPlanDP(PacingPlan):
                 
         MIN_SEGMENT_LENGTH = 5
 
-        for a in range(max(1, self.max_cached_paces), self.total_paces):
+        for a in range(max(1, self.cached_m_paces), self.current_m_paces):
             if verbose:
                 print(f'PROGRESSED TO A = {a}')
             for i in range(n):
@@ -281,56 +328,22 @@ class PacingPlanDP(PacingPlan):
                     self.LOSS[i,k,a] = lowest_loss
                     self.OPT[i,k,a] = int(best_j)
         
-        self.max_cached_paces = self.total_paces
+        self.cached_m_paces = self.current_m_paces
 
     def change_total_paces(self, new_total_paces):
-        if new_total_paces > self.total_paces:
-            self.LOSS = np.pad(self.LOSS, ((0,0), (0,0), (0,new_total_paces-self.total_paces)), 'constant', constant_values=np.inf)
-            self.OPT = np.pad(self.OPT, ((0,0), (0,0), (0,new_total_paces-self.total_paces)), 'constant', constant_values=-1)
+        if new_total_paces > self.current_m_paces:
+            self.LOSS = np.pad(self.LOSS, ((0,0), (0,0), (0,new_total_paces-self.current_m_paces)), 'constant', constant_values=np.inf)
+            self.OPT = np.pad(self.OPT, ((0,0), (0,0), (0,new_total_paces-self.current_m_paces)), 'constant', constant_values=-1)
 
-        self.total_paces = new_total_paces
+        self.current_m_paces = new_total_paces
 
-    def handle_DP(self, verbose):
-        self.calculate_DP(verbose)
+    def handle_brute_force(self, verbose):
+        self.calculate_brute_force(verbose)
         self.backtrack_solution()
-        self.gen_aggregate_paces()
-        self.full_seg_times = np.multiply(self.agg_paces, self.race_course.distances)
+        self.gen_full_paces()
+        self.full_seg_times = np.multiply(self.true_paces_full, self.race_course.distances)
         self.compute_true_time()
 
-    def gen_pace_chart(self,file_path, include_optimal_paces=False, include_recommended_paces=True):
-        if not include_optimal_paces and not include_recommended_paces:
-            raise ValueError("at least one of include_optimal_paces or include_recommended_paces must be True")
-
-        fig,ax = plt.subplots()
-        fig.set_figwidth(20)
-
-        distances = np.insert(self.race_course.end_distance, 0,0)
-        full_elevations = np.append(self.race_course.elevations, self.race_course.end_elevations[-1])
-        ax.plot(distances, full_elevations, label ='elevation', color='blue')
-
-        ax.set_xlabel('distance (miles)')
-        ax.set_ylabel('elevation (feet)')
-        ax.legend(loc="upper left")
-
-        ax2 = ax.twinx()
-        ax2.set_ylabel('pace (min/mile)')
-
-        if include_optimal_paces:
-            optimal_paces_y = np.append(self.optimal_paces, self.optimal_paces[-1])
-            ax2.step(distances, optimal_paces_y, label='optimal paces', color='orange', alpha=0.4, where='post')
-
-        if include_recommended_paces:
-            agg_paces_y = np.append(self.agg_paces, self.agg_paces[-1])
-            ax2.step(distances, agg_paces_y, label='recommended paces', color='red', where='post')
-
-            for i, xy in enumerate(zip(distances, self.agg_paces)):
-                if i in self.changes:
-                    pace = self.agg_paces[i]
-                    ax2.annotate(f'{self.get_display_txt_for_pace(pace)}', xy, xytext=(10,10), textcoords='offset pixels')
-
-        ax.set_title(f'{self.race_course.course_name} Pacing Plan')
-        plt.savefig(file_path, bbox_inches='tight',dpi=300)
-    
 def init_parser() -> argparse.ArgumentParser:
     '''
     Initializes the command line flag parser for this file.
@@ -400,8 +413,8 @@ def main():
     
     print('\nCreating Pacing Plan\n')
     target_time = args.time
-    total_paces = args.paces
-    plan = PacingPlanDP(course, target_time, total_paces)
+    current_m_paces = args.paces
+    plan = PacingPlanBruteForce(course, target_time, current_m_paces)
 
     repeat = True
     is_first_iter = True
@@ -409,18 +422,20 @@ def main():
     while repeat:
 
         if not is_first_iter:
-            new_paces = input("\nInput number of paces: ")
-            plan.change_total_paces(int(new_paces))
-            total_paces = new_paces
+            new_m_paces = input("\nInput number of paces: ")
+            plan.change_total_paces(int(new_m_paces))
+            current_m_paces = new_m_paces
         
-        plan_identifier = f'{total_paces} paces {target_time:.0f} min {course.n_segments} segs'
+        plan_identifier = f'{current_m_paces} paces {target_time:.d0f} min {course.n_segments} segs'
 
-        print('\nRunning DP Algorithm\n')
-        plan.handle_DP(verbose=True)
+        print('\nRunning Brute Force Algorithm\n')
+        plan.handle_brute_force(verbose=True)
+        # full_plan_txt = plan.gen_full_text()
+
         pace_plot_file_path = directory+ plan_identifier + '.jpg'
         geojson_file_path   = directory+ plan_identifier + '.json'
         pace_plan_file_path = directory+ plan_identifier + '.txt'
-        plan.gen_pace_chart(pace_plot_file_path, include_optimal_paces=True, include_recommended_paces=True)
+        plan.gen_pace_chart(pace_plot_file_path, incl_opt_paces=True, incl_true_paces=True)
         plan.gen_geojson(geojson_file_path, use_loop)
         
         with open(pace_plan_file_path, 'w') as f:

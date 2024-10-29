@@ -32,6 +32,7 @@ class PacingPlan:
         self.total_paces = total_paces
         self.generate_optimal_paces()
         self.true_time = None
+        self.max_cached_paces = 0
 
     def get_grades(self):
         return self.race_course.grades
@@ -58,6 +59,24 @@ class PacingPlan:
         self.optimal_paces = np.full(grades.shape, self.base_pace) + adjustments
         self.optimal_segment_times = np.multiply(self.get_distances(), self.optimal_paces)
 
+        # TODO: optimize this using numpy functions
+    
+    # generates a complete array of paces that we run for every segment
+    def gen_aggregate_paces(self):
+        agg_paces = []
+        for i in range(len(self.changes)):
+            if i == self.total_paces - 1:
+                high = self.get_n_segments()
+            else:
+                high = self.changes[i+1]
+            num_copies = high - self.changes[i]
+            to_add = [self.recommended_paces[i]]*num_copies
+            agg_paces += to_add
+        self.agg_paces = np.array(agg_paces)        
+
+    """
+    populates self.elapsed_dists, self.true_segment_times, self.true_time
+    """
     def compute_true_time(self, verbose=True):
         n = self.get_n_segments()
         times = []
@@ -87,14 +106,7 @@ class PacingPlan:
 
         self.elapsed_dists = dists
         self.true_segment_times = times
-
         self.true_time = sum(times)
-
-    def get_true_time(self):
-        if self.true_time is None:
-            self.compute_true_time()
-
-        return self.true_time
 
     @staticmethod
     def get_display_txt_for_pace(pace):
@@ -111,9 +123,11 @@ class PacingPlan:
             lat = seg.start_lat
             lon = seg.start_lon
             pace = self.agg_paces[i]
+            dist = self.race_course.distances[i]
+            time = pace * dist
             elevation = seg.start_ele
         
-            display_txt += f"{i}, {pace}, {lat}, {lon}, {elevation} \n"
+            display_txt += f"{i}, {pace}, {lat}, {lon}, {elevation}, {dist}, {time} \n"
         return display_txt
     
     def gen_geojson(self, file_path, loop):
@@ -167,7 +181,7 @@ class PacingPlan:
         header = f'{self.race_course.course_name}: {self.target_time} minute plan'
         display_txt += header + '\n\n'
 
-        total_time = self.get_true_time()
+        total_time = self.true_time 
 
         for i, pace in enumerate(self.recommended_paces):
             lat_lon_txt = ''
@@ -197,21 +211,6 @@ class PacingPlanDP(PacingPlan):
         self.WP = np.zeros((n,n+1))
         self.LOSS = np.ones((n, n+1, total_paces)) * np.inf
         self.OPT = np.ones((n, n+1, total_paces)).astype(int)*-1
-        self.max_cached_paces = 0
-    
-    # TODO: optimize this using numpy functions
-    # generates a complete array of paces that we run for every segment
-    def gen_aggregate_paces(self):
-        agg_paces = []
-        for i in range(len(self.changes)):
-            if i == self.total_paces - 1:
-                high = self.get_n_segments()
-            else:
-                high = self.changes[i+1]
-            num_copies = high - self.changes[i]
-            to_add = [self.recommended_paces[i]]*num_copies
-            agg_paces += to_add
-        self.agg_paces = np.array(agg_paces)
 
     """Returns the set of indices that represent the segments we change pace on for a pacing plan 
     for interval [i,k) with [a] pace changes remaining """
@@ -295,7 +294,8 @@ class PacingPlanDP(PacingPlan):
         self.calculate_DP(verbose)
         self.backtrack_solution()
         self.gen_aggregate_paces()
-        # self.get_true_time()
+        self.full_seg_times = np.multiply(self.agg_paces, self.race_course.distances)
+        self.compute_true_time()
 
     def gen_pace_chart(self,file_path, include_optimal_paces=False, include_recommended_paces=True):
         if not include_optimal_paces and not include_recommended_paces:

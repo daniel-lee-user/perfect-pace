@@ -31,6 +31,7 @@ class PacingPlan:
         self.race_course = race_course
         self.total_paces = total_paces
         self.generate_optimal_paces()
+        self.true_time = None
 
     def get_grades(self):
         return self.race_course.grades
@@ -61,6 +62,7 @@ class PacingPlan:
         n = self.get_n_segments()
         times = []
         dists = []
+
         for i, pace in enumerate(self.recommended_paces):
             if i == len(self.recommended_paces) - 1:
                 end_seg = n-1

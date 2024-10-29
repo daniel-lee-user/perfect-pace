@@ -23,104 +23,43 @@ conversion = {
 # later, we want to be able to work in any metric or imperial units.
 
 class PacingPlan:
-
     def __init__(self,race_course : racecourse.RaceCourse, target_time, total_paces):
-        self.get_pace_adjustments_vf = np.vectorize(PacingPlan.get_pace_adjustment)
         self.target_time = target_time
         self.race_course = race_course
         self.current_m_paces = total_paces
+        grades = self.race_course.grades
+        adjustments = PacingPlan.get_pace_adjustments(grades)
+        self.base_pace = (self.target_time - np.dot(adjustments, self.get_distances())) / np.sum(self.get_distances())
+        self.optimal_paces = np.full(grades.shape, self.base_pace) + adjustments
+        self.optimal_seg_times = np.multiply(self.get_distances(), self.optimal_paces)
 
-        # generate_optimal_paces
-        self.base_pace = None
-        self.optimal_paces = None
-        self.optimal_seg_times = None
+        # Populated after pace recommendations are calculated
+        self.critical_segments = np.ones(self.current_m_paces).astype(int)*-1
+        self.true_paces_abbrev = np.ones(self.current_m_paces).astype(float) * -1 
+        self.true_paces_full = np.ones(self.race_course.n_segments).astype(float) * -1
+        self.elapsed_dists = np.ones(self.current_m_paces).astype(float) * -1
+        self.true_seg_times = np.ones(self.current_m_paces).astype(float) * -1
+        self.true_total_time = 0
+    
+    """Returns amount that we change the pace in minutes / mile for a given elevation grade using
+    Jack Daniels formula"""
+    @staticmethod
+    def get_pace_adjustment_scalar(grade):
+        if grade > 0:
+            return (12 * abs(grade) / 60)
+        else:
+            return (-7 * abs(grade) / 60)
 
-        # Pace Recommendation algorithm
-        self.critical_segments = None
-        self.true_paces_abbrev = None
-
-        # gen_aggregate_paces
-        self.true_paces_full = None
-
-        # compute_true_time
-        self.elapsed_dists = None
-        self.true_seg_times = None
-        self.true_total_time = None
-
-        self.generate_optimal_paces()
-
-    def get_grades(self):
-        return self.race_course.grades
+    @classmethod
+    def get_pace_adjustments(cls, grades):
+        vf = np.vectorize(cls.get_pace_adjustment_scalar)
+        return vf(grades)
     
     def get_distances(self):
         return self.race_course.distances
     
     def get_n_segments(self):
-        return self.race_course.n_segments
-
-    """Returns amount that we change the pace in minutes / mile for a given elevation grade using
-    Jack Daniels formula"""
-    @staticmethod
-    def get_pace_adjustment(grade):
-        if grade > 0:
-            return (12 * abs(grade) / 60)
-        else:
-            return (-7 * abs(grade) / 60)
-    
-    def generate_optimal_paces(self):
-        grades = self.get_grades()
-        adjustments = self.get_pace_adjustments_vf(grades)
-        self.base_pace = (self.target_time - np.dot(adjustments, self.get_distances())) / np.sum(self.get_distances())
-        self.optimal_paces = np.full(grades.shape, self.base_pace) + adjustments
-        self.optimal_seg_times = np.multiply(self.get_distances(), self.optimal_paces)
-
-    # TODO: optimize this using numpy functions
-    # generates a complete array of paces that we run for every segment
-    def gen_full_paces(self):
-        full_paces = []
-        for i in range(len(self.critical_segments)):
-            if i == self.current_m_paces - 1:
-                high = self.get_n_segments()
-            else:
-                high = self.critical_segments[i+1]
-            num_copies = high - self.critical_segments[i]
-            paces_to_add = [self.true_paces_abbrev[i]]*num_copies
-            full_paces += paces_to_add
-        self.true_paces_full = np.array(full_paces)        
-
-    """
-    populates self.elapsed_dists, self.true_segment_times, self.true_time
-    """
-    def compute_true_time(self, verbose=True):
-        n = self.get_n_segments()
-        times = []
-        dists = []
-
-        for i, pace in enumerate(self.true_paces_abbrev):
-            if i == len(self.true_paces_abbrev) - 1:
-                end_seg = n-1
-            else:
-                end_seg = self.critical_segments[i+1] - 1
-            end_dist = self.race_course.end_distances[end_seg]
-
-            if i == 0:
-                start_dist = 0
-            else:
-                start_seg = self.critical_segments[i]
-                start_dist = self.race_course.end_distances[start_seg-1]
-            
-            elapsed_dist = end_dist - start_dist
-            
-            time = pace*elapsed_dist
-            if verbose == True:
-                print(f'segment range [{self.critical_segments[i]}, {end_seg+1}] has dist {elapsed_dist:.2f}')
-                print(f'run at {pace:.2f} min / mile for {time:.2f} minutes')
-            times += [time]
-            dists += [elapsed_dist]
-
-        self.elapsed_dists = dists
-        self.true_seg_times = times
-        self.true_total_time = sum(times)
+        return self.race_course.n_segments  
 
     @staticmethod
     def get_display_txt_for_pace(pace):
@@ -258,7 +197,6 @@ class PacingPlanBruteForce(PacingPlan):
         self.OPT = np.ones((n, n+1, total_paces)).astype(int)*-1
         self.cached_m_paces = 0
 
-
     """Returns the set of indices that represent the segments we change pace on for a pacing plan 
     for interval [i,k) with [a] pace changes remaining """
     def get_idxs(self,i,k,a, verbose=False):
@@ -275,25 +213,26 @@ class PacingPlanBruteForce(PacingPlan):
     
     def backtrack_solution(self):
         n = self.get_n_segments()
+        m_paces = self.current_m_paces
 
         # list of segment indices where we change the paces
         self.critical_segments = np.array(sorted(self.get_idxs(0,n, self.current_m_paces-1))).astype(int)
 
-        # TODO: Remove assertionerror
-        if len(self.critical_segments) != self.current_m_paces:
-            raise AssertionError('Number of pace changes computed is not equal to total_paces')
+        for j in range(m_paces):
+            low = self.critical_segments[j]
+            high = n if (j == m_paces - 1) else self.critical_segments[j+1]
+            pace = self.WP[low, high]
+            self.true_paces_full[low:high] = pace
+            self.true_paces_abbrev[j] = pace
 
-        # list of pace changes (i.e. [5,7,6.5] means we run 5 min/mile at segment 0 )
-        paces = []
-
-        for j in range(self.current_m_paces-1):
-            i1 = self.critical_segments[j]
-            i2 = self.critical_segments[j+1]
-            paces.append(self.WP[i1,i2])
+            # time calculations
+            end_dist = self.race_course.end_distances[high-1]
+            start_dist = self.race_course.start_distances[low]
+            elapsed_dist = end_dist - start_dist
+            self.elapsed_dists[j] = elapsed_dist
+            self.true_seg_times[j] = pace * elapsed_dist
         
-        paces.append(self.WP[int(self.critical_segments[-1]), n])
-
-        self.true_paces_abbrev = np.array(paces)
+        self.true_total_time = np.sum(self.true_seg_times)
 
     def calculate_brute_force(self, verbose=True):
         n = self.get_n_segments()
@@ -334,15 +273,18 @@ class PacingPlanBruteForce(PacingPlan):
         if new_total_paces > self.current_m_paces:
             self.LOSS = np.pad(self.LOSS, ((0,0), (0,0), (0,new_total_paces-self.current_m_paces)), 'constant', constant_values=np.inf)
             self.OPT = np.pad(self.OPT, ((0,0), (0,0), (0,new_total_paces-self.current_m_paces)), 'constant', constant_values=-1)
+        
+        self.critical_segments = np.ones(new_total_paces).astype(int)*-1
+        self.true_paces_abbrev = np.ones(new_total_paces).astype(float) * -1 
+        self.elapsed_dists = np.ones(new_total_paces).astype(float) * -1
+        self.true_seg_times = np.ones(new_total_paces).astype(float) * -1
 
         self.current_m_paces = new_total_paces
 
     def handle_brute_force(self, verbose):
         self.calculate_brute_force(verbose)
         self.backtrack_solution()
-        self.gen_full_paces()
         self.full_seg_times = np.multiply(self.true_paces_full, self.race_course.distances)
-        self.compute_true_time()
 
 def init_parser() -> argparse.ArgumentParser:
     '''
@@ -426,15 +368,13 @@ def main():
             plan.change_total_paces(int(new_m_paces))
             current_m_paces = new_m_paces
         
-        plan_identifier = f'{current_m_paces} paces {target_time:.d0f} min {course.n_segments} segs'
+        plan_identifier = f'{target_time:.0f}min_{current_m_paces}p_{course.n_segments}'
 
         print('\nRunning Brute Force Algorithm\n')
         plan.handle_brute_force(verbose=True)
-        # full_plan_txt = plan.gen_full_text()
-
-        pace_plot_file_path = directory+ plan_identifier + '.jpg'
-        geojson_file_path   = directory+ plan_identifier + '.json'
-        pace_plan_file_path = directory+ plan_identifier + '.txt'
+        pace_plot_file_path = directory + plan_identifier + '.jpg'
+        geojson_file_path   = directory + plan_identifier + '.json'
+        pace_plan_file_path = directory + plan_identifier + '.txt'
         plan.gen_pace_chart(pace_plot_file_path, incl_opt_paces=True, incl_true_paces=True)
         plan.gen_geojson(geojson_file_path, use_loop)
         

@@ -5,17 +5,6 @@ import os.path
 import json
 import argparse
 
-conversion = {
-    'meters_to_miles': 0.0006213712,
-    'meters_to_feet': 3.28084,
-    'miles_to_feet': 5280,
-    'miles_to_meters': 1609.34,
-    'feet_to_miles': 0.000189394,
-    'feet_to_meters': 0.3048,
-    'meters_to_km': 1000,
-    'km_to_meters': 0.001
-}
-
 # TODO: create export function for pacing plan
 # TODO: ensure that paces sum up to target time
 
@@ -71,9 +60,8 @@ class PacingPlan:
 
         display_txt = ""
         for i in range(self.get_n_segments()):
-            seg = self.race_course.segments[i]
-            lat = seg.start_lat
-            lon = seg.start_lon
+            lat = self.race_course.lats[i]
+            lon = self.race_course.lons[i]
             pace = self.true_paces_full[i]
             dist = self.race_course.distances[i]
             time = pace * dist
@@ -136,8 +124,7 @@ class PacingPlan:
         for i, pace in enumerate(self.true_paces_abbrev):
             lat_lon_txt = ''
             if self.race_course is type(racecourse.RealRaceCourse):
-                seg = self.race_course.segments[i]
-                lat_lon_txt = f' @ ({seg.start_lat},{seg.start_lon})'
+                lat_lon_txt = f' @ ({self.race_course.lats[i]},{self.race_course.lons[i]})'
             distance_duration = self.elapsed_dists[i]
             start_distance = self.race_course.start_distances[self.critical_segments[i]]
             txt = f"{i}: {start_distance:.2f} mi\t{self.get_display_txt_for_pace(pace)}/mile for {distance_duration:.2f} mi{lat_lon_txt}"
@@ -337,7 +324,7 @@ def main():
 
     else:
         course_name = os.path.basename(file_path).split('.')[0]
-        course = racecourse.RealRaceCourse(course_name, file_path, use_smoothing)
+        course = racecourse.RealRaceCourse(course_name, file_path)
 
     print(f'\n{str(course)}')
 

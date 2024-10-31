@@ -2,6 +2,7 @@ import numpy as np
 import racecourse
 import matplotlib.pyplot as plt
 import os.path
+from abc import ABC, abstractmethod
 import json
 import argparse
 
@@ -11,7 +12,7 @@ import argparse
 # GENERAL NOTE: for now, all units below are in feet for elevation and miles for distance (for readability). 
 # later, we want to be able to work in any metric or imperial units.
 
-class PacingPlan:
+class PacingPlan(ABC):
     def __init__(self,race_course : racecourse.RaceCourse, target_time, total_paces):
         self.target_time = target_time
         self.race_course = race_course
@@ -50,8 +51,13 @@ class PacingPlan:
     def get_n_segments(self):
         return self.race_course.n_segments  
 
+    """Calculates pacing plan and populates relevant attributes"""
+    @abstractmethod
+    def calculate_recommendations(self):
+        pass
+
     @staticmethod
-    def get_display_txt_for_pace(pace):
+    def get_pace_display_text(pace):
         m, s = divmod(pace*60, 60)
         return (f'{m:.0f}:{int(s):02d}')
     
@@ -127,7 +133,7 @@ class PacingPlan:
                 lat_lon_txt = f' @ ({self.race_course.lats[i]},{self.race_course.lons[i]})'
             distance_duration = self.elapsed_dists[i]
             start_distance = self.race_course.start_distances[self.critical_segments[i]]
-            txt = f"{i}: {start_distance:.2f} mi\t{self.get_display_txt_for_pace(pace)}/mile for {distance_duration:.2f} mi{lat_lon_txt}"
+            txt = f"{i}: {start_distance:.2f} mi\t{self.get_pace_display_text(pace)}/mile for {distance_duration:.2f} mi{lat_lon_txt}"
             display_txt += txt + '\n'
         
         display_txt += f"\nTotal time: {self.true_total_time :.2f}"
@@ -163,7 +169,7 @@ class PacingPlan:
             for i, xy in enumerate(zip(x, self.true_paces_full)):
                 if i in self.critical_segments:
                     pace = self.true_paces_full[i]
-                    ax2.annotate(f'{self.get_display_txt_for_pace(pace)}', xy, xytext=(10,10), textcoords='offset pixels')
+                    ax2.annotate(f'{self.get_pace_display_text(pace)}', xy, xytext=(10,10), textcoords='offset pixels')
 
         ax.set_title(f'{self.race_course.course_name} Pacing Plan')
         plt.savefig(file_path, bbox_inches='tight',dpi=300)
@@ -179,6 +185,7 @@ class PacingPlanBruteForce(PacingPlan):
     def __init__(self,race_course : racecourse.RaceCourse, target_time, total_paces):
         super().__init__(race_course, target_time, total_paces)
         n = self.get_n_segments()
+        self.MIN_SEGMENT_LENGTH = 5 # TODO: test different values of this parameter; dynamically change its initialization based off the race course
         self.WP = np.zeros((n,n+1))
         self.LOSS = np.ones((n, n+1, total_paces)) * np.inf
         self.OPT = np.ones((n, n+1, total_paces)).astype(int)*-1
@@ -223,29 +230,24 @@ class PacingPlanBruteForce(PacingPlan):
 
     def calculate_brute_force(self, verbose=True):
         n = self.get_n_segments()
-
-        if self.current_m_paces <= self.cached_m_paces:
-            return
         
         if self.cached_m_paces == 0:
+            # TODO: rewrite using numpy vectorized functions
             for i in range(n):
                 for j in range(i+1, n+1):
                     self.WP[i,j] = np.dot(self.optimal_paces[i:j], self.get_distances()[i:j] / sum(self.get_distances()[i:j]))
                     self.LOSS[i,j,0] = np.sum(self.optimal_paces[i:j] - self.WP[i,j])
-                
-        MIN_SEGMENT_LENGTH = 5
 
         for a in range(max(1, self.cached_m_paces), self.current_m_paces):
             if verbose:
                 print(f'PROGRESSED TO A = {a}')
             for i in range(n):
                 # k >= i + number of pace changes + 1 
-                for k in range(i+(a+1)*MIN_SEGMENT_LENGTH, n+1):
-                    j = i+MIN_SEGMENT_LENGTH
-                    best_j = j 
-                    lowest_loss = self.LOSS[i,j,0] + self.LOSS[j,k,a-1]
+                for k in range(i+(a+1)*self.MIN_SEGMENT_LENGTH, n+1):
+                    best_j = -1 
+                    lowest_loss = np.inf
                     
-                    for j in range(i+MIN_SEGMENT_LENGTH,k - MIN_SEGMENT_LENGTH + 1):
+                    for j in range(i+self.MIN_SEGMENT_LENGTH,k - self.MIN_SEGMENT_LENGTH + 1):
                         loss = self.LOSS[i,j,0] + self.LOSS[j,k,a-1]
                         if loss < lowest_loss:
                             lowest_loss = loss
@@ -256,20 +258,21 @@ class PacingPlanBruteForce(PacingPlan):
         
         self.cached_m_paces = self.current_m_paces
 
-    def change_total_paces(self, new_total_paces):
-        if new_total_paces > self.current_m_paces:
-            self.LOSS = np.pad(self.LOSS, ((0,0), (0,0), (0,new_total_paces-self.current_m_paces)), 'constant', constant_values=np.inf)
-            self.OPT = np.pad(self.OPT, ((0,0), (0,0), (0,new_total_paces-self.current_m_paces)), 'constant', constant_values=-1)
+    def change_total_paces(self, new_m_paces):
+        if new_m_paces > self.current_m_paces:
+            self.LOSS = np.pad(self.LOSS, ((0,0), (0,0), (0,new_m_paces-self.current_m_paces)), 'constant', constant_values=np.inf)
+            self.OPT = np.pad(self.OPT, ((0,0), (0,0), (0,new_m_paces-self.current_m_paces)), 'constant', constant_values=-1)
         
-        self.critical_segments = np.ones(new_total_paces).astype(int)*-1
-        self.true_paces_abbrev = np.ones(new_total_paces).astype(float) * -1 
-        self.elapsed_dists = np.ones(new_total_paces).astype(float) * -1
-        self.true_seg_times = np.ones(new_total_paces).astype(float) * -1
+        self.critical_segments = np.ones(new_m_paces).astype(int)*-1
+        self.true_paces_abbrev = np.ones(new_m_paces).astype(float) * -1 
+        self.elapsed_dists = np.ones(new_m_paces).astype(float) * -1
+        self.true_seg_times = np.ones(new_m_paces).astype(float) * -1
 
-        self.current_m_paces = new_total_paces
+        self.current_m_paces = new_m_paces
 
-    def handle_brute_force(self, verbose):
-        self.calculate_brute_force(verbose)
+    def calculate_recommendations(self, verbose=True):
+        if self.current_m_paces > self.cached_m_paces:
+            self.calculate_brute_force(verbose)
         self.backtrack_solution()
         self.full_seg_times = np.multiply(self.true_paces_full, self.race_course.distances)
 
@@ -358,7 +361,7 @@ def main():
         plan_identifier = f'{target_time:.0f}min_{current_m_paces}p_{course.n_segments}'
 
         print('\nRunning Brute Force Algorithm\n')
-        plan.handle_brute_force(verbose=True)
+        plan.calculate_recommendations(verbose=True)
         pace_plot_file_path = directory + plan_identifier + '.jpg'
         geojson_file_path   = directory + plan_identifier + '.json'
         pace_plan_file_path = directory + plan_identifier + '.txt'

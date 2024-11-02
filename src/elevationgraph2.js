@@ -25,12 +25,13 @@ L.Control.Elevation = L.Control.extend({
         forceAxisBounds: false
     },
 
-    onRemove: function(map) {
+    onRemove: function (map) {
         this._container = null;
     },
 
-    onAdd: function(map) {
+    onAdd: function (map) {
         this._map = map;
+        var segmentIndex = this._segmentIndex = [];
 
         var opts = this.options;
         var margin = opts.margins;
@@ -49,16 +50,15 @@ L.Control.Elevation = L.Control.extend({
 
         var area = this._area = d3.svg.area()
             .interpolate(opts.interpolation)
-            .x(function(d) {
+            .x(function (d) {
                 var xDiagCoord = x(d.dist);
                 d.xDiagCoord = xDiagCoord;
                 return xDiagCoord;
             })
             .y0(this._height())
-            .y1(function(d) {
+            .y1(function (d) {
                 return y(d.altitude);
             });
-
         var container = this._container = L.DomUtil.create("div", "elevation");
 
         this._initToggle();
@@ -74,10 +74,10 @@ L.Control.Elevation = L.Control.extend({
 
         var line = d3.svg.line();
         line = line
-            .x(function(d) {
+            .x(function (d) {
                 return d3.mouse(svg.select("g"))[0];
             })
-            .y(function(d) {
+            .y(function (d) {
                 return this._height();
             });
 
@@ -96,16 +96,16 @@ L.Control.Elevation = L.Control.extend({
         if (L.Browser.touch) {
 
             background.on("touchmove.drag", this._dragHandler.bind(this)).
-            on("touchstart.drag", this._dragStartHandler.bind(this)).
-            on("touchstart.focus", this._mousemoveHandler.bind(this));
+                on("touchstart.drag", this._dragStartHandler.bind(this)).
+                on("touchstart.focus", this._mousemoveHandler.bind(this));
             L.DomEvent.on(this._container, 'touchend', this._dragEndHandler, this);
 
         } else {
 
             background.on("mousemove.focus", this._mousemoveHandler.bind(this)).
-            on("mouseout.focus", this._mouseoutHandler.bind(this)).
-            on("mousedown.drag", this._dragStartHandler.bind(this)).
-            on("mousemove.drag", this._dragHandler.bind(this));
+                on("mouseout.focus", this._mouseoutHandler.bind(this)).
+                on("mousedown.drag", this._dragStartHandler.bind(this)).
+                on("mousemove.drag", this._dragHandler.bind(this));
             L.DomEvent.on(this._container, 'mouseup', this._dragEndHandler, this);
 
         }
@@ -114,6 +114,35 @@ L.Control.Elevation = L.Control.extend({
         this._yaxisgraphicnode = g.append("g");
         this._appendXaxis(this._xaxisgraphicnode);
         this._appendYaxis(this._yaxisgraphicnode);
+
+        // Create the checkbox container with a white background
+        const checkboxContainer = L.DomUtil.create('div', 'checkbox-container', container);
+        checkboxContainer.style.backgroundColor = 'white'; // Set white background
+        checkboxContainer.style.padding = '2px 5px';
+        checkboxContainer.style.textAlign = 'center';
+        checkboxContainer.style.margin = 'auto';
+        checkboxContainer.style.width = '25%';
+
+        // Add checkbox
+        const checkbox = L.DomUtil.create('input', '', checkboxContainer);
+        checkbox.type = 'checkbox';
+        checkbox.id = 'paceCheckbox';
+        checkbox.checked = false;
+
+        // Add label for checkbox
+        const label = L.DomUtil.create('label', '', checkboxContainer);
+        label.htmlFor = 'paceCheckbox';
+        label.innerText = 'Show Pace Markers';
+
+        L.DomEvent.disableClickPropagation(container);
+
+        checkbox.addEventListener('change', () => {
+            if (checkbox.checked) {
+                this._showPaceMarkers(); // Replace with your function to show markers
+            } else {
+                this._hidePaceMarkers(); // Replace with your function to hide markers
+            }
+        });
 
         var focusG = this._focusG = g.append("g");
         this._mousefocus = focusG.append('svg:line')
@@ -127,7 +156,7 @@ L.Control.Elevation = L.Control.extend({
             .attr("class", "mouse-focus-label-x");
         this._focuslabelY = focusG.append("svg:text")
             .style("pointer-events", "none")
-            .attr("class", "mouse-focus-label-y");        
+            .attr("class", "mouse-focus-label-y");
 
         // Create a label for pace
         this._paceLabel = focusG.append("svg:text")
@@ -138,12 +167,12 @@ L.Control.Elevation = L.Control.extend({
         }
 
         background.on("mousemove.focus", this._mousemoveHandler.bind(this))
-        .on("mouseout.focus", this._mouseoutHandler.bind(this));
+            .on("mouseout.focus", this._mouseoutHandler.bind(this));
 
         return container;
     },
 
-    _dragHandler: function() {
+    _dragHandler: function () {
 
         //we don´t want map events to occur here
         d3.event.preventDefault();
@@ -158,7 +187,7 @@ L.Control.Elevation = L.Control.extend({
     /*
      * Draws the currently dragged rectabgle over the chart.
      */
-    _drawDragRectangle: function() {
+    _drawDragRectangle: function () {
 
         if (!this._dragStartCoords) {
             return;
@@ -190,7 +219,7 @@ L.Control.Elevation = L.Control.extend({
     /*
      * Removes the drag rectangle and zoms back to the total extent of the data.
      */
-    _resetDrag: function() {
+    _resetDrag: function () {
 
         if (this._dragRectangleG) {
 
@@ -209,7 +238,7 @@ L.Control.Elevation = L.Control.extend({
     /*
      * Handles end of dragg operations. Zooms the map to the selected items extent.
      */
-    _dragEndHandler: function() {
+    _dragEndHandler: function () {
 
         if (!this._dragStartCoords || !this._gotDragged) {
             this._dragStartCoords = null;
@@ -230,7 +259,7 @@ L.Control.Elevation = L.Control.extend({
 
     },
 
-    _dragStartHandler: function() {
+    _dragStartHandler: function () {
 
         d3.event.preventDefault();
         d3.event.stopPropagation();
@@ -244,8 +273,8 @@ L.Control.Elevation = L.Control.extend({
     /*
      * Finds a data entry for a given x-coordinate of the diagram
      */
-    _findItemForX: function(x) {
-        var bisect = d3.bisector(function(d) {
+    _findItemForX: function (x) {
+        var bisect = d3.bisector(function (d) {
             return d.dist;
         }).left;
         var xinvert = this._x.invert(x);
@@ -255,10 +284,10 @@ L.Control.Elevation = L.Control.extend({
     /*
      * Finds an item with the smallest delta in distance to the given latlng coords
      */
-    _findItemForLatLng: function(latlng) {
+    _findItemForLatLng: function (latlng) {
         var result = null,
             d = Infinity;
-        this._data.forEach(function(item) {
+        this._data.forEach(function (item) {
             var dist = latlng.distanceTo(item.latlng);
             if (dist < d) {
                 d = dist;
@@ -269,7 +298,7 @@ L.Control.Elevation = L.Control.extend({
     },
 
     /** Make the map fit the route section between given indexes. */
-    _fitSection: function(index1, index2) {
+    _fitSection: function (index1, index2) {
 
         var start = Math.min(index1, index2),
             end = Math.max(index1, index2);
@@ -280,7 +309,7 @@ L.Control.Elevation = L.Control.extend({
 
     },
 
-    _initToggle: function() {
+    _initToggle: function () {
 
         /* inspired by L.Control.Layers */
 
@@ -322,20 +351,20 @@ L.Control.Elevation = L.Control.extend({
         }
     },
 
-    _expand: function() {
+    _expand: function () {
         this._container.className = this._container.className.replace(' elevation-collapsed', '');
     },
 
-    _collapse: function() {
+    _collapse: function () {
         L.DomUtil.addClass(this._container, 'elevation-collapsed');
     },
 
-    _width: function() {
+    _width: function () {
         var opts = this.options;
         return opts.width - opts.margins.left - opts.margins.right;
     },
 
-    _height: function() {
+    _height: function () {
         var opts = this.options;
         return opts.height - opts.margins.top - opts.margins.bottom;
     },
@@ -343,7 +372,7 @@ L.Control.Elevation = L.Control.extend({
     /*
      * Fromatting funciton using the given decimals and seperator
      */
-    _formatter: function(num, dec, sep) {
+    _formatter: function (num, dec, sep) {
         var res;
         if (dec === 0) {
             res = Math.round(num) + "";
@@ -361,7 +390,7 @@ L.Control.Elevation = L.Control.extend({
         return res;
     },
 
-    _appendYaxis: function(y) {
+    _appendYaxis: function (y) {
         y.attr("class", "y axis")
             .call(d3.svg.axis()
                 .scale(this._y)
@@ -374,7 +403,7 @@ L.Control.Elevation = L.Control.extend({
             .text("m");
     },
 
-    _appendXaxis: function(x) {
+    _appendXaxis: function (x) {
         x.attr("class", "x axis")
             .attr("transform", "translate(0," + this._height() + ")")
             .call(d3.svg.axis()
@@ -388,7 +417,7 @@ L.Control.Elevation = L.Control.extend({
             .text("km");
     },
 
-    _updateAxis: function() {
+    _updateAxis: function () {
         this._xaxisgraphicnode.selectAll("g").remove();
         this._xaxisgraphicnode.selectAll("path").remove();
         this._xaxisgraphicnode.selectAll("text").remove();
@@ -399,7 +428,7 @@ L.Control.Elevation = L.Control.extend({
         this._appendYaxis(this._yaxisgraphicnode);
     },
 
-    _mouseoutHandler: function() {
+    _mouseoutHandler: function () {
 
         this._hidePositionMarker();
     },
@@ -407,7 +436,7 @@ L.Control.Elevation = L.Control.extend({
     /*
      * Hides the position-/heigth indication marker drawn onto the map
      */
-    _hidePositionMarker: function() {
+    _hidePositionMarker: function () {
 
         if (this._marker) {
             this._map.removeLayer(this._marker);
@@ -427,14 +456,14 @@ L.Control.Elevation = L.Control.extend({
     /*
      * Handles the moueseover the chart and displays distance and altitude level
      */
-    _mousemoveHandler: function(d, i, ctx) {
+    _mousemoveHandler: function (d, i, ctx) {
         if (!this._data || this._data.length === 0) {
             return;
         }
         var coords = d3.mouse(this._background.node());
         var opts = this.options;
         var index = this._findItemForX(coords[0]);
-        var item = this._data[index];    
+        var item = this._data[index];
         // Check if item is defined and contains the necessary properties
         if (!item || typeof item.altitude === 'undefined' || typeof item.dist === 'undefined' || typeof item.latlng === 'undefined') {
             //console.warn("Item not found or missing properties at index:", index);
@@ -446,7 +475,6 @@ L.Control.Elevation = L.Control.extend({
             ll = item.latlng,
             numY = opts.hoverNumber.formatter(alt, opts.hoverNumber.decimalsY),
             numX = opts.hoverNumber.formatter(dist, opts.hoverNumber.decimalsX);
-
         this._showDiagramIndicator(item, coords[0]);
 
         var layerpoint = this._map.latLngToLayerPoint(ll);
@@ -492,7 +520,7 @@ L.Control.Elevation = L.Control.extend({
 
             this._mouseHeightFocusLabel.attr("x", layerpoint.x)
                 .attr("y", normalizedY)
-                .text(item.pace.toFixed(3) + " mi/min")
+                .text(item.pace.toFixed(4) + " min/mi")
                 .style("visibility", "visible");
 
         } else {
@@ -514,7 +542,7 @@ L.Control.Elevation = L.Control.extend({
     /*
      * Parsing of GeoJSON data lines and their elevation in z-coordinate
      */
-    _addGeoJSONData: function(coords) {
+    _addGeoJSONData: function (coords) {
         if (coords) {
             var data = this._data || [];
             var dist = this._dist || 0;
@@ -539,7 +567,7 @@ L.Control.Elevation = L.Control.extend({
         }
     },
 
-    _addGeoJSONDataPace: function(coords, p) {
+    _addGeoJSONDataPace: function (coords, p) {
         if (coords) {
             var data = this._data || [];
             var dist = this._dist || 0;
@@ -568,7 +596,7 @@ L.Control.Elevation = L.Control.extend({
     /*
      * Parsing function for GPX data as used by https://github.com/mpetazzoni/leaflet-gpx
      */
-    _addGPXdata: function(coords) {
+    _addGPXdata: function (coords) {
         if (coords) {
             var data = this._data || [];
             var dist = this._dist || 0;
@@ -584,7 +612,7 @@ L.Control.Elevation = L.Control.extend({
                     altitude: s.meta.ele,
                     x: s.lng,
                     y: s.lat,
-                    latlng: s 
+                    latlng: s
                 });
             }
             this._dist = dist;
@@ -592,7 +620,7 @@ L.Control.Elevation = L.Control.extend({
             this._maxElevation = ele;
         }
     },
-    _addGPXdataPace: function(coords, p) {
+    _addGPXdataPace: function (coords, p) {
         if (coords) {
             var data = this._data || [];
             var dist = this._dist || 0;
@@ -618,19 +646,24 @@ L.Control.Elevation = L.Control.extend({
         }
     },
 
-    _addData: function(d) {
+    _addData: function (d) {
         var geom = d && d.geometry && d.geometry;
         var i;
         //console.log(d)
         if (geom && d.properties.pace !== undefined) {
             switch (geom.type) {
                 case 'LineString':
-                    //console.log(d.properties.pace);
+                    var data = this._data || [];
+                    const start = data.length;
+                    this._segmentIndex.push(start);
                     this._addGeoJSONDataPace(geom.coordinates, d.properties.pace);
                     break;
 
                 case 'MultiLineString':
                     for (i = 0; i < geom.coordinates.length; i++) {
+                        var data = this._data || [];
+                        const start = data.length;
+                        this._segmentIndex.push(start);
                         this._addGeoJSONDataPace(geom.coordinates[i], d.properties.pace);
                     }
                     break;
@@ -661,7 +694,7 @@ L.Control.Elevation = L.Control.extend({
                 this._addData(d.features[i]);
             }
         }
-        if(d && d._latlngs && d.type == "Feature" && d.properties.pace !== undefined) {
+        if (d && d._latlngs && d.type == "Feature" && d.properties.pace !== undefined) {
             this._addGPXdataPace(d._latlngs, d.properties.pace);
 
         } else if (d && d._latlngs) {
@@ -672,7 +705,7 @@ L.Control.Elevation = L.Control.extend({
     /*
      * Calculates the full extent of the data array
      */
-    _calculateFullExtent: function(data) {
+    _calculateFullExtent: function (data) {
 
         if (!data || data.length < 1) {
             throw new Error("no data in parameters");
@@ -680,7 +713,7 @@ L.Control.Elevation = L.Control.extend({
 
         var ext = new L.latLngBounds(data[0].latlng, data[0].latlng);
 
-        data.forEach(function(item) {
+        data.forEach(function (item) {
             ext.extend(item.latlng);
         });
 
@@ -692,7 +725,7 @@ L.Control.Elevation = L.Control.extend({
      * Add data to the diagram either from GPX or GeoJSON and
      * update the axis domain and data
      */
-    addData: function(d, layer) {
+    addData: function (d, layer) {
         this._addData(d);
         if (this._container) {
             this._applyData();
@@ -709,7 +742,7 @@ L.Control.Elevation = L.Control.extend({
     /*
      * Handles mouseover events of the data layers on the map.
      */
-    _handleLayerMouseOver: function(evt) {
+    _handleLayerMouseOver: function (evt) {
         if (!this._data || this._data.length === 0) {
             return;
         }
@@ -719,9 +752,9 @@ L.Control.Elevation = L.Control.extend({
             var x = item.xDiagCoord;
             this._showDiagramIndicator(item, x);
             var layerpoint = this._map.latLngToLayerPoint(item.latlng);
-            if(!this._pointM) {
+            if (!this._pointM) {
                 var heightG = d3.select(".leaflet-overlay-pane svg")
-                .append("g");
+                    .append("g");
                 var pointM = this._pointM = heightG.append("g");
                 pointM.append("svg:circle")
                     .attr("r", 6)
@@ -734,15 +767,56 @@ L.Control.Elevation = L.Control.extend({
                 .style("visibility", "visible");
         }
     },
-    
-    _handleLayerMouseOut: function(evt) {
+
+    _handleLayerMouseOut: function (evt) {
         //console.log("OUt");
         if (this._pointM) {
             this._pointM.style("visibility", "hidden");
         }
     },
 
-    _showDiagramIndicator: function(item, xCoordinate) {
+    _showPaceMarkers: function () {
+        var g = d3.select(this._container).select("svg").select("g");
+        this._segmentIndex.forEach((element, index) => {
+            var xCoordinate = this._data[element].xDiagCoord;
+            var paceValue = this._data[element].pace.toFixed(4);
+
+            // Group for each pace marker
+            var paceGroup = g.append("g");
+
+            // Adding the pace line in red color
+            paceGroup.append('svg:line')
+                .attr('class', 'pace-line')
+                .attr('x1', xCoordinate)
+                .attr('y1', '0')
+                .attr('x2', xCoordinate)
+                .attr('y2', this._height())
+                .attr('stroke', 'red')
+                .attr('visibility', 'visible');
+
+            // Adjusting the y position to stagger labels and prevent overlap
+            var labelYPosition = this._height() - 65 - (index % 5) * 15; // Adjust 15px per line
+
+            // Adding the pace label
+            paceGroup.append("svg:text")
+                .attr("class", "pace-label-line")
+                .attr("x", xCoordinate)
+                .attr("y", labelYPosition)  // Staggered y-position
+                .text(paceValue + " min/mi")
+                .style("pointer-events", "none")
+                .attr('visibility', 'visible');
+        });
+    },
+
+    _hidePaceMarkers: function () {
+        // Hide both lines and labels
+        d3.select(this._container).select("svg").selectAll(".pace-line")
+            .attr('visibility', 'hidden');
+        d3.select(this._container).select("svg").selectAll(".pace-label-line")
+            .attr('visibility', 'hidden');
+    },
+
+    _showDiagramIndicator: function (item, xCoordinate) {
         var opts = this.options;
         this._focusG.style("visibility", "visible");
         this._mousefocus.attr('x1', xCoordinate)
@@ -762,16 +836,16 @@ L.Control.Elevation = L.Control.extend({
         this._focuslabelY.attr("y", this._height() - 5)
             .attr("x", xCoordinate)
             .text(numX + " km");
-        this._paceLabel.attr("y", this._height() -65)
+        this._paceLabel.attr("y", this._height() - 65)
             .attr("x", xCoordinate)
-            .text(item.pace.toFixed(2) + " mi/min");
+            .text(item.pace.toFixed(4) + " min/mi");
     },
 
-    _applyData: function() {
-        var xdomain = d3.extent(this._data, function(d) {
+    _applyData: function () {
+        var xdomain = d3.extent(this._data, function (d) {
             return d.dist;
         });
-        var ydomain = d3.extent(this._data, function(d) {
+        var ydomain = d3.extent(this._data, function (d) {
             return d.altitude;
         });
         var opts = this.options;
@@ -795,7 +869,7 @@ L.Control.Elevation = L.Control.extend({
     /*
      * Reset data
      */
-    _clearData: function() {
+    _clearData: function () {
         this._data = null;
         this._dist = null;
         this._maxElevation = null;
@@ -804,7 +878,7 @@ L.Control.Elevation = L.Control.extend({
     /*
      * Reset data and display
      */
-    clear: function() {
+    clear: function () {
 
         this._clearData();
 
@@ -824,6 +898,6 @@ L.Control.Elevation = L.Control.extend({
 
 });
 
-L.control.elevation = function(options) {
+L.control.elevation = function (options) {
     return new L.Control.Elevation(options);
 };

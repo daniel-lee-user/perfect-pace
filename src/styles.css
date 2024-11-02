@@ -93,16 +93,24 @@ footer {
     color: #888;
 }
 
-/* Styling for the checkbox container */
 .checkbox-container {
     display: flex;
-    align-items: center;
-    justify-content: center;
-    margin-top: 15px;
+    flex-direction: column; /* Stack elements vertically */
+    align-items: center; /* Align items to the left */
+    margin-top: 10px;
 }
 
-.checkbox-container input {
-    margin-right: 10px;
+.checkbox-container label {
+    margin-bottom: 2px; /* Reduced space below each label */
+}
+
+.checkbox-container input[type="checkbox"] {
+    margin-bottom: 1px; /* Space below checkbox */
+}
+
+.checkbox-container select {
+    width: 100px; /* Set a specific width for the select container */
+    margin-bottom: 5px; /* Space below select */
 }
 
 /* Pace changes input styling */

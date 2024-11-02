@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pacing Plan Generator</title>
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="src/styles.css">
 </head>
 <body>
 
@@ -27,9 +27,13 @@
         <!-- Checkbox for loop course -->
         <div class="checkbox-container">
             <label for="loops">Is this course a loop?</label>
-            </div>
             <input type="checkbox" id="loops" name="loops" value="loops">
-        </div>
+            <label for="plan-type">Plan Type:</label>
+            <select id="plan-type" name="plan-type">
+                <option value="DP">DP</option>
+                <option value="LP">LP</option>
+            </select>
+        </div>        
 
         <div id="errorMessage" class="error"></div>
 
@@ -44,6 +48,6 @@
     </div>
 
     <script src="https://unpkg.com/@mapbox/togeojson@0.16.0/togeojson.js"></script>
-    <script src="script.js"></script>
+    <script src="src/script.js"></script>
 </body>
 </html>

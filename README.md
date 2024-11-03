@@ -21,4 +21,4 @@ Flags:
 -h              ==> opens help menu
 ```
 
-Example: `python dp_alg.py -f "data/boston.gpx" -t 180 -p 2`
+Example: `python dp_alg.py -f "data/Lakefront-Loops-5K.gpx" -t 30 -p 8`

@@ -1,19 +1,25 @@
+import gpxpy
 import gpx_parser
 import numpy as np
 import matplotlib
 from gpx_parser import Segment
 from utils import cprint
+import math
+from enum import Enum
 
-conversion = {
-    'meters_to_miles': 0.0006213712,
-    'meters_to_feet': 3.28084,
-    'miles_to_feet': 5280,
-    'miles_to_meters': 1609.34,
-    'feet_to_miles': 0.000189394,
-    'feet_to_meters': 0.3048,
-    'meters_to_km': 1000,
-    'km_to_meters': 0.001
-}
+class Conversions(Enum):
+    METERS_TO_MILES = 0.0006213712
+    METERS_TO_FEET = 3.28084
+    MILES_TO_FEET = 5280
+    MILES_TO_METERS = 1609.34
+    FEET_TO_MILES = 0.000189394
+    FEET_TO_METERS = 0.3048
+    METERS_TO_KM = 1000
+    KM_TO_METERS = 0.001
+
+class Unit(Enum):
+    METRIC = 1
+    IMPERIAL = 2
 
 # TODO: Remove hard-coded conversions to feet and miles
 # elevation data is stored as feet
@@ -126,7 +132,7 @@ class RaceCourse:
     def gen_course_plot(self, file_path):
         fig,ax = matplotlib.pyplot.subplots()
         fig.set_figwidth(20)
-        distances = np.insert(self.end_distance, 0,0)
+        distances = np.insert(self.end_distances, 0,0)
         full_elevations = np.append(self.elevations, self.end_elevations[-1])
         ax.plot(distances, full_elevations, label ='elevation', color='blue')
         ax.set_xlabel('distance (miles)')
@@ -137,9 +143,6 @@ class RaceCourse:
         ax2.plot(distances, full_grades, label='grade', color='red')
         ax.set_title(self.course_name)
         matplotlib.pyplot.savefig(file_path, bbox_inches='tight',dpi=300)
-
-    def repr_segment(self, i):
-        raise NotImplementedError("You should implement this method on a subclass")
 
     # TODO: hard coded smoothing values 
     # TODO: use more sophisticated smoothing method
@@ -156,6 +159,145 @@ class RaceCourse:
                f"Total Distance: {self.total_distance:.2f} miles\n"\
                 f"Total Segments: {self.n_segments}")
 
+class RealRaceCourse(RaceCourse):
+
+    def __init__(self, name, file_path):
+        super().__init__(name)
+
+        self.segments = gpx_parser.parse_gpx(file_path) # remove after all references to segments are removed
+
+        self.units = Unit.METRIC
+        self.file_path = file_path
+        lats, lons, elevations = self.parse_gpx()
+
+        self.lats = np.array(lats)
+        self.lons = np.array(lons)
+        elevations = np.array(elevations)
+
+        calculate_distance = np.vectorize(RealRaceCourse.calculate_distance_scalar)
+        self.raw_distances = calculate_distance(self.lats[:-1], self.lons[:-1], self.lats[1:], self.lons[1:])
+
+        if np.isnan(elevations).any():
+            raise ValueError("nan values found in elevations")
+        
+        valid_indices = self.raw_distances != 0
+        self.distances = self.raw_distances[valid_indices]
+        self.n_segments = len(self.distances)
+
+        self.end_distances = np.cumsum(self.distances) 
+        self.start_distances = np.roll(self.end_distances,1)
+        self.start_distances[0] = 0
+        self.total_distance = self.end_distances[-1]
+
+        valid_elevations = elevations[np.append(valid_indices, True)]
+        self.elevations = valid_elevations[:-1]
+        self.elevations_metric = self.elevations
+        self.end_elevations = valid_elevations[1:]
+        self.elevation_changes = self.end_elevations - self.elevations
+
+        calculate_grade = np.vectorize(RealRaceCourse.calculate_grade_scalar)
+        self.grades = calculate_grade(self.elevation_changes, self.distances)
+
+        self.convert_metric_to_imperial()
+
+    def parse_gpx(self):
+        lats = []
+        lons = []
+        elevations = []
+
+        with open(self.file_path, 'r') as gpx_file:
+            gpx = gpxpy.parse(gpx_file)
+            for track in gpx.tracks:
+                for segment in track.segments:
+                    for i in range(len(segment.points)):
+                        point = segment.points[i]
+                        if point.latitude is None or point.longitude is None or point.elevation is None:
+                            raise ValueError(f"some of the trackpoint info is missing: {point}")
+                        
+                        lats.append(point.latitude)
+                        lons.append(point.longitude)
+                        elevations.append(point.elevation)
+
+        return lats, lons, elevations
+
+    @staticmethod
+    def calculate_grade_scalar(elevation_change, distance):
+        return elevation_change / distance * 100
+
+    @staticmethod
+    def calculate_distance_scalar(start_lat, start_lon, end_lat, end_lon):
+        radius = 6371
+        lat1, lon1, lat2, lon2 = map(math.radians, [start_lat, start_lon, end_lat, end_lon])
+        dlat = lat2 - lat1
+        dlon = lon2 - lon1
+        a = math.sin(dlat / 2)**2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2)**2
+        c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+        distance = radius * c * 1000
+        return distance
+
+    def convert_metric_to_imperial(self):
+        if self.units == Unit.IMPERIAL:
+            return
+        self.distances = self.distances * Conversions.METERS_TO_MILES.value 
+        self.end_distances = self.end_distances * Conversions.METERS_TO_MILES.value
+        self.start_distances =   self.start_distances * Conversions.METERS_TO_MILES.value
+        self.total_distance = self.total_distance * Conversions.METERS_TO_MILES.value
+
+        self.elevations = self.elevations * Conversions.METERS_TO_FEET.value
+        self.end_elevations = self.end_elevations * Conversions.METERS_TO_FEET.value
+        self.elevation_changes = self.elevation_changes * Conversions.METERS_TO_FEET.value
+        
+        self.units = Unit.IMPERIAL
+
+class RealRaceCourse_DEPRECATED(RaceCourse):
+
+    def __init__(self, name, file_path, use_smoothing=False, param=10):
+        super().__init__(name)
+        self.segments = gpx_parser.parse_gpx(file_path)
+        self.n_segments = len(self.segments)
+        elevation_changes = []
+        elevations = []
+        end_elevations = []
+        grades = []
+        distances = []
+
+        for i in range(self.n_segments):
+            seg = self.segments[i]
+            try:
+                elevation_changes.append(seg.elevation_change * Conversions.METERS_TO_FEET.value) 
+                elevations.append(seg.start_ele * Conversions.METERS_TO_FEET.value)
+                end_elevations.append(seg.end_ele * Conversions.METERS_TO_FEET.value)
+                grades.append(seg.grade)
+                distances.append(seg.distance * Conversions.METERS_TO_MILES.value) 
+            except Exception as e:
+                print(f'error at segment {i}')   
+                print(repr(e))          
+
+        self.distances = np.array(distances)
+        self.end_distances = np.cumsum(self.distances) 
+        self.start_distances = np.roll(self.end_distances,1)
+        self.start_distances[0] = 0
+        self.total_distance = self.end_distances[-1]
+        self.elevation_changes = np.array(elevation_changes)
+        self.elevations = np.array(elevations)
+        self.end_elevations = np.array(end_elevations)
+        self.grades = np.array(grades)
+
+        if use_smoothing:
+            self.apply_smoothing(param)
+
+    # TODO: IMPLEMENT OPTIMAL / ACCURATE ALGORITHM. 
+    # VERIFY THAT THESE RECOMPUTED VALUES ARE STILL CLOSE TO THE ORIGINAL
+    def apply_smoothing(self, param):
+        # 1. smooth elevation
+        self.elevations = self.smooth_attribute(self.elevations, param)
+        self.end_elevations = self.smooth_attribute(self.end_elevations, param)
+        # 2. recompute elevation changes
+        self.elevation_changes = self.end_elevations - self.elevations
+        # 3. recompute grades
+        grade_vf = np.vectorize(self.calculate_grade)
+        self.grades = grade_vf(self.elevation_changes *Conversions.FEET_TO_MILES.value,self.distances) 
+    
 class RandomRaceCourse(RaceCourse):
     def apply_smoothing(self):
         self.elevation_changes = self.smooth_attribute(self.elevation_changes, param=10)
@@ -181,11 +323,11 @@ class RandomRaceCourse(RaceCourse):
 
         self.distances = self.distances * total_dist / (sum(self.distances))
         grade_vf = np.vectorize(self.calculate_grade)
-        self.grades = grade_vf(self.elevation_changes *conversion['feet_to_miles'],self.distances) 
+        self.grades = grade_vf(self.elevation_changes * Conversions.FEET_TO_MILES.value ,self.distances) 
         self.total_distance = total_dist
-        self.end_distance = np.cumsum(self.distances)
-        self.start_distance = np.roll(self.end_distance,1)
-        self.start_distance[0] = 0
+        self.end_distances = np.cumsum(self.distances)
+        self.start_distances = np.roll(self.end_distances,1)
+        self.start_distances[0] = 0
         self.gen_elevations()
 
     def gen_elevations(self):
@@ -199,63 +341,4 @@ class RandomRaceCourse(RaceCourse):
         self.elevations -= min_val
         self.end_elevations -= min_val
     
-    def repr_segment(self,i):
-        return (f"segment {i} \n"\
-                f"{self.end_distance[i]:.2f} miles \n"\
-                f"elevation: {self.elevations[i]:.2f} feet \n"\
-                f"grade: {self.grades[i]:.2f} degrees")
-        
-class RealRaceCourse(RaceCourse):
-    # TODO: IMPLEMENT OPTIMAL / ACCURATE ALGORITHM. 
-    # VERIFY THAT THESE RECOMPUTED VALUES ARE STILL CLOSE TO THE ORIGINAL
-    def apply_smoothing(self, param):
-        # 1. smooth elevation
-        self.elevations = self.smooth_attribute(self.elevations, param)
-        self.end_elevations = self.smooth_attribute(self.end_elevations, param)
-        # 2. recompute elevation changes
-        self.elevation_changes = self.end_elevations - self.elevations
-        # 3. recompute grades
-        grade_vf = np.vectorize(self.calculate_grade)
-        self.grades = grade_vf(self.elevation_changes *conversion['feet_to_miles'],self.distances) 
-
-    def __init__(self, name, file_path, use_smoothing=False, param=10):
-        super().__init__(name)
-        self.segments = gpx_parser.parse_gpx(file_path)
-        self.n_segments = len(self.segments)
-        self.elevation_changes = []
-        self.elevations = []
-        self.end_elevations = []
-        self.grades = []
-        self.distances = []
-
-        for i in range(self.n_segments):
-            seg = self.segments[i]
-            try:
-                self.elevation_changes.append(seg.elevation_change * conversion['meters_to_miles']) 
-                self.elevations.append(seg.start_ele)
-                self.end_elevations.append(seg.end_ele)
-                self.grades.append(seg.grade)
-                self.distances.append(seg.distance * conversion['meters_to_miles']) 
-            except Exception as e:
-                print(f'error at segment {i}')   
-                print(repr(e))          
-
-        self.end_distance = np.cumsum(self.distances)
-        self.start_distance = np.roll(self.end_distance,1)
-        self.start_distance[0] = 0
-        self.total_distance = self.end_distance[-1]
-        self.elevation_changes = np.array(self.elevation_changes)
-        self.elevations = np.array(self.elevations)
-        self.end_elevations = np.array(self.end_elevations)
-        self.grades = np.array(self.grades)
-        self.distances = np.array(self.distances)
-
-        if use_smoothing:
-            self.apply_smoothing(param)
-
-    def repr_segment(self,i):
-        return (f"segment {i} \n"\
-                f"@ ({self.segments[i].start_lat:.2f}, {self.segments[i].start_lon:.2f})\n"
-                f"{self.end_distance[i]:.2f} miles \n"\
-                f"elevation: {self.elevations[i]:.2f} feet \n"\
-                f"grade: {self.grades[i]:.2f} degrees")
+      

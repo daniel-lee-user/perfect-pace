@@ -355,7 +355,7 @@ def init_parser() -> argparse.ArgumentParser:
     parser.add_argument("-p", "--paces", type=int, help="the total number of paces", required=True)
 
     parser.add_argument("-l", "--loop", action="store_true", help="include this flag if the course contains a loop")
-    parser.add_argument("-s", "--smoothen", action="store_true", help="include if the course should be smoothened (UNIMPLEMENTED)")
+    parser.add_argument("-s", "--smoothen", help="include if the course should be smoothened. running_avg, loess")
     parser.add_argument("-r", action="store_true", help="include this flag if you want a random course")
 
     return parser
@@ -364,7 +364,7 @@ def main():
     parser = init_parser()
     args = parser.parse_args()
 
-    if args.r or args.smoothen:
+    if args.r:
         raise RuntimeError("unimplemented")
 
     file_path = args.file
@@ -383,6 +383,9 @@ def main():
     else:
         course_name = os.path.basename(file_path).split('.')[0]
         course = racecourse.RealRaceCourse(course_name, file_path, use_smoothing)
+
+    if args.smoothen:
+        course.smoothen_segments(args.smoothen)
 
     print(f'\n{str(course)}')
 

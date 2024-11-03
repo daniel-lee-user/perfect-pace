@@ -1,6 +1,8 @@
 import gpx_parser
 import numpy as np
 import matplotlib
+from gpx_parser import Segment
+from utils import cprint
 
 conversion = {
     'meters_to_miles': 0.0006213712,
@@ -21,10 +23,105 @@ conversion = {
 class RaceCourse:
     def __init__(self, name):
         self.course_name = name
+        self.segments: list[Segment] = None  # list of Segment objects
 
     @staticmethod
     def calculate_grade(elevation_change, distance):
         return (elevation_change / distance) * 100
+    
+    # TODO find some better arg values for smoothening function...
+    def smoothen_segments(self, smoothen: str = "running avg", *args):
+        '''
+        Smoothens the segments in this racecourse. 
+
+        NOTE: `running avg` modifies the actual segment values themselves and recomputes everything 
+        (ie. if you initialized a new RaceCourse with those segment values), whereas `loess` only 
+        modifies the arrays `elevation_change` and `grades`, leaving the original segment values unchanged.
+
+        :param str type: How to smoothen the course.
+        '''
+        if smoothen == "running avg":
+            WINDOW_SIZE = 3
+            elevation = 0
+            grade = 0
+            slope_angle = 0
+            dist = 0
+
+            if len(self.segments) < WINDOW_SIZE:
+                return
+
+            # create an average window
+            for i in range(WINDOW_SIZE):
+                weight = self.segments[i].distance
+                elevation += self.segments[i].elevation_change * weight
+                grade += self.segments[i].grade * weight
+                slope_angle += self.segments[i].slope_angle * weight
+                dist += weight
+            
+            # TODO implement edges too
+            # iterate window through segments, skipping edges
+            for i in range(WINDOW_SIZE // 2, len(self.segments) - WINDOW_SIZE // 2):
+                # update condition for the window, skip first instance since already computed
+                if i != WINDOW_SIZE // 2:
+                    # add new value
+                    weight = self.segments[i + WINDOW_SIZE // 2].distance
+                    elevation += self.segments[i + WINDOW_SIZE // 2].elevation_change * weight
+                    grade += self.segments[i + WINDOW_SIZE // 2].grade * weight
+                    slope_angle += self.segments[i + WINDOW_SIZE // 2].slope_angle * weight
+                    dist += weight
+
+                    # remove old value
+                    weight = self.segments[i - WINDOW_SIZE // 2].distance
+                    elevation -= self.segments[i - WINDOW_SIZE // 2].elevation_change * weight
+                    grade -= self.segments[i - WINDOW_SIZE // 2].grade * weight
+                    slope_angle -= self.segments[i - WINDOW_SIZE // 2].slope_angle * weight
+                    dist -= weight
+
+
+                # self.segments[i].elevation_change = 0
+                # self.segments[i].grade = 0
+                # self.segments[i].slope_angle = 0
+
+                self.segments[i].elevation_change = elevation / dist
+                self.segments[i].grade = grade / dist
+                self.segments[i].slope_angle = slope_angle / dist
+
+                # TODO clean this up later, this is just a copy of a section of __init__
+                self.elevation_changes = []
+                self.elevations = []
+                self.end_elevations = []
+                self.grades = []
+                self.distances = []
+
+                for i in range(self.n_segments):
+                    seg = self.segments[i]
+                    try:
+                        self.elevation_changes.append(seg.elevation_change * conversion['meters_to_miles']) 
+                        self.elevations.append(seg.start_ele)
+                        self.end_elevations.append(seg.end_ele)
+                        self.grades.append(seg.grade)
+                        self.distances.append(seg.distance * conversion['meters_to_miles']) 
+                    except Exception as e:
+                        print(f'error at segment {i}')   
+                        print(repr(e))          
+
+                self.end_distance = np.cumsum(self.distances)
+                self.start_distance = np.roll(self.end_distance,1)
+                self.start_distance[0] = 0
+                self.total_distance = self.end_distance[-1]
+                self.elevation_changes = np.array(self.elevation_changes)
+                self.elevations = np.array(self.elevations)
+                self.end_elevations = np.array(self.end_elevations)
+                self.grades = np.array(self.grades)
+                self.distances = np.array(self.distances)
+        elif smoothen == "loess":
+            raise RuntimeError(f"Unimplemented smoothening argument: {smoothen}")
+        else:
+            raise RuntimeError(f"Unrecognized smmothening argument: {smoothen}!")
+
+        
+
+
     
     def gen_course_plot(self, file_path):
         fig,ax = matplotlib.pyplot.subplots()

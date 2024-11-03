@@ -40,10 +40,6 @@ class RaceCourse:
         '''
         Smoothens the segments in this racecourse. 
 
-        NOTE: `running avg` modifies the actual segment values themselves and recomputes everything 
-        (ie. if you initialized a new RaceCourse with those segment values), whereas `loess` only 
-        modifies the arrays `elevation_change` and `grades`, leaving the original segment values unchanged.
-
         :param str type: How to smoothen the course.
         '''
         if smoothen == "running avg":
@@ -92,34 +88,38 @@ class RaceCourse:
                 self.segments[i].grade = grade / dist
                 self.segments[i].slope_angle = slope_angle / dist
 
+                # TODO confirm if these are the correct arrays that need to be modified. @HERE
+                self.grades = np.array([self.segments[i].grade for i in range(len(self.segments))])
+                self.elevation_changes = np.array([self.segments[i].elevation_change for i in range(len(self.segments))])
+
                 # TODO clean this up later, this is just a copy of a section of __init__
-                self.elevation_changes = []
-                self.elevations = []
-                self.end_elevations = []
-                self.grades = []
-                self.distances = []
+                # self.elevation_changes = []
+                # self.elevations = []
+                # self.end_elevations = []
+                # self.grades = []
+                # self.distances = []
 
-                for i in range(self.n_segments):
-                    seg = self.segments[i]
-                    try:
-                        self.elevation_changes.append(seg.elevation_change * conversion['meters_to_miles']) 
-                        self.elevations.append(seg.start_ele)
-                        self.end_elevations.append(seg.end_ele)
-                        self.grades.append(seg.grade)
-                        self.distances.append(seg.distance * conversion['meters_to_miles']) 
-                    except Exception as e:
-                        print(f'error at segment {i}')   
-                        print(repr(e))          
+                # for i in range(self.n_segments):
+                #     seg = self.segments[i]
+                #     try:
+                #         self.elevation_changes.append(seg.elevation_change * conversion['meters_to_miles']) 
+                #         self.elevations.append(seg.start_ele)
+                #         self.end_elevations.append(seg.end_ele)
+                #         self.grades.append(seg.grade)
+                #         self.distances.append(seg.distance * conversion['meters_to_miles']) 
+                #     except Exception as e:
+                #         print(f'error at segment {i}')   
+                #         print(repr(e))          
 
-                self.end_distance = np.cumsum(self.distances)
-                self.start_distance = np.roll(self.end_distance,1)
-                self.start_distance[0] = 0
-                self.total_distance = self.end_distance[-1]
-                self.elevation_changes = np.array(self.elevation_changes)
-                self.elevations = np.array(self.elevations)
-                self.end_elevations = np.array(self.end_elevations)
-                self.grades = np.array(self.grades)
-                self.distances = np.array(self.distances)
+                # self.end_distance = np.cumsum(self.distances)
+                # self.start_distance = np.roll(self.end_distance,1)
+                # self.start_distance[0] = 0
+                # self.total_distance = self.end_distance[-1]
+                # self.elevation_changes = np.array(self.elevation_changes)
+                # self.elevations = np.array(self.elevations)
+                # self.end_elevations = np.array(self.end_elevations)
+                # self.grades = np.array(self.grades)
+                # self.distances = np.array(self.distances)
         elif smoothen == "loess":
             raise RuntimeError(f"Unimplemented smoothening argument: {smoothen}")
         else:

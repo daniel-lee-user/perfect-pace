@@ -78,7 +78,7 @@ class PacingPlan(ABC):
             display_txt += f"{i}, {pace}, {lat}, {lon}, {elevation}, {dist}, {time} \n"
         return display_txt
     
-    def gen_pace_per_mile(self):
+    def compute_pace_per_mile(self):
         n_mile_markers = math.ceil(self.race_course.total_distance)
         mile_markers = np.argwhere(self.race_course.end_distances - np.floor(self.race_course.end_distances) - self.race_course.distances <= 0)
         mile_markers = mile_markers.reshape(n_mile_markers,)
@@ -182,7 +182,7 @@ class PacingPlan(ABC):
 
     """Generates a simplified .txt pacing plan that includes just the different pace segments
         TODO: rename as gen_plan_per_pace_segment"""
-    def gen_abbrev_plan(self):
+    def gen_plan_per_pace_segment(self):
         display_txt = ""
 
         header = f'{self.race_course.course_name}: {self.target_time} minute plan'
@@ -240,7 +240,7 @@ class PacingPlan(ABC):
         if verbose:
             return self.gen_full_text()
         else:
-            return self.gen_abbrev_plan()
+            return self.gen_plan_per_pace_segment()
         
 class PacingPlanBruteForce(PacingPlan):
     def __init__(self,race_course : racecourse.RaceCourse, target_time, total_paces):
@@ -336,7 +336,7 @@ class PacingPlanBruteForce(PacingPlan):
             self.calculate_brute_force(verbose)
         self.backtrack_solution()
         self.full_seg_times = np.multiply(self.true_paces_full, self.race_course.distances)
-        self.gen_pace_per_mile()
+        self.compute_pace_per_mile()
 def init_parser() -> argparse.ArgumentParser:
     '''
     Initializes the command line flag parser for this file.

@@ -6,7 +6,7 @@ To install the requirements for the UI use `npm install` within the app director
 
 # Usage
 
-Run this file using `python dp_alg.py [FLAGS]`. Use `python dp_alg.py -h` for help on usage.
+Run this file using `python pacing_plan.py [FLAGS]`. Use `python pacing_plan.py -h` for help on usage.
 
 Flags:
 

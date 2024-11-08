@@ -174,7 +174,7 @@ class PacingPlan(ABC):
         ax.set_title(f'{self.race_course.course_name} Pacing Plan')
         plt.savefig(file_path, bbox_inches='tight',dpi=300)
     
-    def __repr__(self, verbose=True):
+    def __repr__(self, verbose=False):
         #TODO: only let this be called if pacing plan has been generated
         if verbose:
             return self.gen_full_text()
@@ -361,7 +361,7 @@ def main():
             plan.change_total_paces(int(new_m_paces))
             current_m_paces = new_m_paces
         
-        plan_identifier = f'{target_time:.0f}min_{current_m_paces}p_{course.n_segments}'
+        plan_identifier = f'{target_time:.0f}min_{current_m_paces}p'
 
         print('\nRunning Brute Force Algorithm\n')
         plan.calculate_recommendations(verbose=True)
@@ -374,7 +374,8 @@ def main():
         with open(pace_plan_file_path, 'w') as f:
             f.write(str(plan))
 
-        repeat = bool(int(input('\nCreate another pace plan? 0/1\t')))
+        #repeat = bool(int(input('\nCreate another pace plan? 0/1\t')))
+        repeat = False
         is_first_iter = False
         
 if __name__ == '__main__':

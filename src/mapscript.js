@@ -6,7 +6,7 @@ window.addEventListener('load', () => {
     }).addTo(map);
 
     // Retrieve the GPX data from localStorage
-    const geoData = localStorage.getItem('geoData');
+    const geoData = sessionStorage.getItem('geoData');
     if (geoData) {
         const geojson = JSON.parse(geoData);
         geojson.features.forEach((feature, index) => {
@@ -33,11 +33,15 @@ window.addEventListener('load', () => {
     }
 
     // Fetch and parse text data from segments.txt
+    /*
     fetch('segments.txt')
         .then(response => response.text())
         .then(text => parseTextData(text))
         .catch(error => console.error('Error loading text file:', error));
+    */
 
+    const txtData = sessionStorage.getItem('textFileContent');
+    parseTextData(txtData);
     // Parse and display text data
     function parseTextData(text) {
         const lines = text.split('\n');
@@ -126,9 +130,12 @@ window.addEventListener('load', () => {
             }).addTo(map);
             map.fitBounds(geoJsonLayer.getBounds());
         }
+        parseTextData(txtData);
+        /*
         fetch('segments.txt')
             .then(response => response.text())
             .then(text => parseTextData(text))
             .catch(error => console.error('Error loading text file:', error));
+        */
     });
 });

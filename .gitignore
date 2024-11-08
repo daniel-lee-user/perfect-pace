@@ -4,4 +4,3 @@ node_modules
 test
 .DS_Store/node_modules
 __pycache__
-data/

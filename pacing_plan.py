@@ -5,6 +5,7 @@ import os.path
 from abc import ABC, abstractmethod
 import json
 import argparse
+import math
 
 # TODO: create export function for pacing plan
 # TODO: ensure that paces sum up to target time
@@ -30,6 +31,7 @@ class PacingPlan(ABC):
         self.elapsed_dists = np.ones(self.current_m_paces).astype(float) * -1
         self.true_seg_times = np.ones(self.current_m_paces).astype(float) * -1
         self.true_total_time = 0
+        self.pace_per_mile = np.ones(int(np.ceil(self.race_course.total_distance)))
     
     """Returns amount that we change the pace in minutes / mile for a given elevation grade using
     Jack Daniels formula"""
@@ -76,6 +78,64 @@ class PacingPlan(ABC):
             display_txt += f"{i}, {pace}, {lat}, {lon}, {elevation}, {dist}, {time} \n"
         return display_txt
     
+    def gen_pace_per_mile(self):
+        n_mile_markers = math.ceil(self.race_course.total_distance)
+        mile_markers = np.argwhere(self.race_course.end_distances - np.floor(self.race_course.end_distances) - self.race_course.distances <= 0)
+        mile_markers = mile_markers.reshape(n_mile_markers,)
+        overflow = 0
+        total_time = 0
+
+        for m in range(n_mile_markers):
+            if m == 0:
+                i = 0
+            else: 
+                i = mile_markers[m] + 1
+            if m == n_mile_markers -1:
+                j = self.race_course.n_segments-1
+            else:
+                j = mile_markers[m+1]
+
+            time = overflow + np.dot(self.race_course.distances[i:j], self.true_paces_full[i:j])
+
+            if m != n_mile_markers - 1:
+                overflow_distance = self.race_course.end_distances[j] - (m+1) # distance from last segment that we exclude
+                incl_distance = self.race_course.distances[j] - overflow_distance
+                incl_time = incl_distance*self.true_paces_full[j]
+                overflow = overflow_distance * self.true_paces_full[j]
+                time += incl_time
+
+                self.pace_per_mile[m] = time
+
+            else:
+                self.pace_per_mile[m] = time / (overflow_distance + np.sum(self.race_course.distances[i:j]))
+            total_time += time
+
+        assert (np.isclose(total_time, self.true_total_time))
+
+    def gen_plan_per_mile(self):
+        display_txt = ""
+
+        header = f'{self.race_course.course_name}: {self.target_time} minute plan'
+        display_txt += header + '\n\n'
+
+        for i, pace in enumerate(self.pace_per_mile):
+            lat_lon_txt = ''
+            # if self.race_course is type(racecourse.RealRaceCourse):
+            #     lat_lon_txt = f' @ ({self.race_course.lats[i]},{self.race_course.lons[i]})'
+            total_distance = self.race_course.total_distance
+            if i < np.floor(total_distance):
+                distance = 1
+                time = pace
+            else:
+                distance = total_distance - math.floor(total_distance)
+                time = pace * distance
+            txt = f"{i}: {i} mi \t{self.get_pace_display_text(pace)}/mile for {distance:.2f} mi and {time:.2f} minutes {lat_lon_txt}"
+            display_txt += txt + '\n'
+        
+        display_txt += f"\nTotal time: {self.true_total_time :.2f}"
+
+        return display_txt
+
     def gen_geojson(self, file_path, loop):
         # Initialize the base structure of the GeoJSON
         geojson_data = {
@@ -120,7 +180,8 @@ class PacingPlan(ABC):
             json.dump(geojson_data, geojson_file, indent=4)
         return geojson_data
 
-    """Generates a simplified .txt pacing plan that includes just the different pace segments"""
+    """Generates a simplified .txt pacing plan that includes just the different pace segments
+        TODO: rename as gen_plan_per_pace_segment"""
     def gen_abbrev_plan(self):
         display_txt = ""
 
@@ -275,7 +336,7 @@ class PacingPlanBruteForce(PacingPlan):
             self.calculate_brute_force(verbose)
         self.backtrack_solution()
         self.full_seg_times = np.multiply(self.true_paces_full, self.race_course.distances)
-
+        self.gen_pace_per_mile()
 def init_parser() -> argparse.ArgumentParser:
     '''
     Initializes the command line flag parser for this file.

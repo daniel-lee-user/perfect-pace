@@ -87,11 +87,11 @@ def main():
     if verbose:
         print(f'\n{str(course)}')
 
-    directory = os.path.join("results", course_name)
-    if not os.path.exists(directory):
-        os.makedirs(directory)
+    course_directory = os.path.join("results", course_name)
+    if not os.path.exists(course_directory):
+        os.makedirs(course_directory)
 
-    plot_path = os.path.join(directory, f'{course_name} {course.n_segments} segs.jpg')
+    plot_path = os.path.join(course_directory, f'{course_name} {course.n_segments} segs.jpg')
 
     try:
         course.gen_course_plot(plot_path)
@@ -113,6 +113,10 @@ def main():
     if verbose:
         print(f'\nCreating Pacing Plan using {args.method} method\n')
 
+    pacing_plan_directory = os.path.join(course_directory, method)
+    if not os.path.exists(pacing_plan_directory):
+        os.makedirs(pacing_plan_directory)
+
     repeat = args.repeat
     is_first_iter = True
 
@@ -129,14 +133,21 @@ def main():
         if verbose:
             print('\nRunning Algorithm\n')
         plan.calculate_recommendations(verbose)
-        pace_plot_file_path = os.path.join(directory, method + plan_identifier + '.jpg')
-        geojson_file_path   = os.path.join(directory, method + plan_identifier + '.json')
-        pace_plan_file_path = os.path.join(directory, method + plan_identifier + '.txt')
-        plan.gen_pace_chart(pace_plot_file_path, incl_opt_paces=True, incl_true_paces=True)
-        plan.gen_geojson(geojson_file_path, use_loop)
+
+        file_path = {
+            'geojson': os.path.join(pacing_plan_directory + '/' + plan_identifier + '.json'),
+            'plot': os.path.join(pacing_plan_directory + '/' + plan_identifier + '.jpg'),
+            'plan_segments': os.path.join(pacing_plan_directory + '/' + plan_identifier + '_segments.txt'),
+            'plan_miles': os.path.join(pacing_plan_directory +  '/' +plan_identifier + "_miles.csv")
+        }
+
+        plan.gen_geojson(file_path['geojson'], use_loop)
+        plan.gen_pace_chart(file_path['plot'], incl_opt_paces=True, incl_true_paces=True)
+        plan.gen_plan_per_mile(file_path["plan_miles"], use_csv=False)
         
-        with open(pace_plan_file_path, 'w') as f:
-            f.write(str(plan))
+        with open(file_path['plan_segments'], 'w') as f:
+            f.write(plan.gen_abbrev_plan())
+
         if repeat:
             repeat = bool(int(input('\nCreate another pace plan? 0/1\t')))
         is_first_iter = False

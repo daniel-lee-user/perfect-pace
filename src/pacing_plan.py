@@ -184,28 +184,38 @@ class PacingPlan(ABC):
 
         return display_txt
     
-    def gen_plan_per_mile(self):
+    """Returns a .csv pace plan in the following schema:
+     [mile_idx], [pace], [time_per_mile], [elapsed_time], [distance (miles)]
+       """
+    def gen_plan_per_mile(self, file_path, use_csv=False):
+        n_mile_markers = math.ceil(self.race_course.total_distance)
+        distance = np.ones(n_mile_markers)
+        distance[-1] = self.race_course.total_distance - n_mile_markers + 1
+        time_per_mile = np.multiply(distance, self.pace_per_mile)
+        elapsed_time = np.cumsum(time_per_mile)
+
+        if use_csv:
+            output = np.stack((np.arange(n_mile_markers), self.pace_per_mile, time_per_mile, elapsed_time, distance), axis=1)
+            np.savetxt(file_path, output, delimiter=',')
+            return output
+        
         display_txt = ""
 
         header = f'{self.race_course.course_name}: {self.target_time} minute plan'
         display_txt += header + '\n\n'
 
-        for i, pace in enumerate(self.pace_per_mile):
-            lat_lon_txt = ''
-            # if self.race_course is type(racecourse.RealRaceCourse):
-            #     lat_lon_txt = f' @ ({self.race_course.lats[i]},{self.race_course.lons[i]})'
-            total_distance = self.race_course.total_distance
-            if i < np.floor(total_distance):
-                distance = 1
-                time = pace
-            else:
-                distance = total_distance - math.floor(total_distance)
-                time = pace * distance
-            txt = f"{i}: {i} mi \t{self.get_pace_display_text(pace)}/mile for {distance:.2f} mi and {time:.2f} minutes {lat_lon_txt}"
+        column_titles = '[mile_idx], [pace], [time_per_mile], [elapsed_time], [distance (miles)]'
+        display_txt += column_titles +'\n'
+
+        for i in range(n_mile_markers):
+            pace = self.pace_per_mile[i]
+            txt = f"{i} mi \t{utils.get_pace_display_text(pace)}/mile \t {time_per_mile[i]} min \t {elapsed_time[i]} min \t {distance[i]} mi"
             display_txt += txt + '\n'
         
         display_txt += f"\nTotal time: {self.true_total_time :.2f}"
-
+        
+        with open(file_path, 'w') as f:
+            f.write(display_txt)
         return display_txt
 
     def gen_pace_chart(self,file_path, incl_opt_paces=False, incl_true_paces=True):

@@ -31,7 +31,9 @@ def init_parser() -> argparse.ArgumentParser:
 
     parser.add_argument("-l", "--loop", action="store_true", help="include this flag if the course contains a loop")
     parser.add_argument("-s", "--smoothen", help="include if the course should be smoothened. running_avg, loess")
-    parser.add_argument("-r", action="store_true", help="include this flag if you want a random course")
+    parser.add_argument("--random", action="store_true", help="include this flag if you want a random course")
+    parser.add_argument("-v", "--verbose", action="store_true", help="Include this flag if you would like to generate the pacing plan in verbose mode")
+    parser.add_argument("-r", "--repeat", action="store_true", help="If you would like to repeat generating pacing plans")
 
     return parser
 
@@ -58,20 +60,21 @@ def main():
     parser = init_parser()
     args = parser.parse_args()
 
-    if args.r:
+    if args.random:
         raise RuntimeError("unimplemented")
 
     file_path = args.file
     use_loop = args.loop
-    use_smoothing = args.smoothen
+    verbose = args.verbose
 
-    if len(file_path) == 0 or args.r:
+    if len(file_path) == 0 or args.random:
 
-        print("\nGenerating Random Course\n")
+        if verbose:
+            print("\nGenerating Random Course\n")
         n_segments = int(input('n_segments: \t\t\t'))
         distance = float(input('distance (miles): \t\t'))
         course_name = f'random {distance:.1f}'
-        course = race_course.RandomRaceCourse(course_name, n_segments, distance, use_smoothing=True)
+        course = race_course.RandomRaceCourse(course_name, n_segments, distance)
         file_path = 'results/random/'
 
     else:
@@ -81,7 +84,8 @@ def main():
     if args.smoothen:
         course.smoothen_segments(args.smoothen)
 
-    print(f'\n{str(course)}')
+    if verbose:
+        print(f'\n{str(course)}')
 
     directory = os.path.join("results", course_name)
     if not os.path.exists(directory):
@@ -94,8 +98,8 @@ def main():
     except Exception as e:
         print(plot_path)
         raise(e)
-    
-    print('\nCreating Pacing Plan\n')
+    if verbose:
+        print('\nCreating Pacing Plan\n')
     target_time = args.time
     current_m_paces = args.paces
     if args.method == "brute_force":
@@ -106,13 +110,13 @@ def main():
         method = 'LP'
     else:
         raise ValueError(f"Unknown pacing plan method: {args.method}")
+    if verbose:
+        print(f'\nCreating Pacing Plan using {args.method} method\n')
 
-    print(f'\nCreating Pacing Plan using {args.method} method\n')
-
-    repeat = True
+    repeat = args.repeat
     is_first_iter = True
 
-    while repeat:
+    while repeat or is_first_iter:
         if not is_first_iter:
             old_method = method
             new_m_paces, method = get_new_inputs()
@@ -121,10 +125,10 @@ def main():
             if old_method != method:
                 plan = PacingPlanBruteForce(course, target_time, current_m_paces) if method == 'BF' else PacingPlanLP(course, target_time, current_m_paces)
         
-        plan_identifier = f'_{target_time:.0f}min_{current_m_paces}p_{course.n_segments}'
-
-        print('\nRunning Algorithm\n')
-        plan.calculate_recommendations(verbose=True)
+        plan_identifier = f'{target_time:.0f}min_{current_m_paces}p'
+        if verbose:
+            print('\nRunning Algorithm\n')
+        plan.calculate_recommendations(verbose)
         pace_plot_file_path = os.path.join(directory, method + plan_identifier + '.jpg')
         geojson_file_path   = os.path.join(directory, method + plan_identifier + '.json')
         pace_plan_file_path = os.path.join(directory, method + plan_identifier + '.txt')
@@ -133,8 +137,8 @@ def main():
         
         with open(pace_plan_file_path, 'w') as f:
             f.write(str(plan))
-
-        repeat = bool(int(input('\nCreate another pace plan? 0/1\t')))
+        if repeat:
+            repeat = bool(int(input('\nCreate another pace plan? 0/1\t')))
         is_first_iter = False
         
 if __name__ == '__main__':

@@ -21,13 +21,13 @@ class RaceCourse:
         return (elevation_change / distance) * 100
     
     # TODO find some better arg values for smoothening function...
-    def smoothen_segments(self, smoothen: str = "running avg", *args):
+    def smoothen_segments(self, smoothen: str = "running_avg", *args):
         '''
         Smoothens the segments in this racecourse. 
 
         :param str type: How to smoothen the course.
         '''
-        if smoothen == "running avg":
+        if smoothen == "running_avg":
             WINDOW_SIZE = 3
             elevation = 0
             grade = 0

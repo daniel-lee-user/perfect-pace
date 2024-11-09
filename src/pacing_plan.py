@@ -1,25 +1,24 @@
 import numpy as np
-import racecourse
+import cvxpy as cp
 import matplotlib.pyplot as plt
-import os.path
+import race_course
 from abc import ABC, abstractmethod
 import json
-import argparse
+import utils
 import math
 
 # TODO: create export function for pacing plan
-# TODO: ensure that paces sum up to target time
 
 # GENERAL NOTE: for now, all units below are in feet for elevation and miles for distance (for readability). 
 # later, we want to be able to work in any metric or imperial units.
 
 class PacingPlan(ABC):
-    def __init__(self,race_course : racecourse.RaceCourse, target_time, total_paces):
+    def __init__(self, race_course : race_course.RaceCourse, target_time, total_paces):
         self.target_time = target_time
         self.race_course = race_course
         self.current_m_paces = total_paces
         grades = self.race_course.grades
-        adjustments = PacingPlan.get_pace_adjustments(grades)
+        adjustments = utils.get_pace_adjustments(grades)
         self.base_pace = (self.target_time - np.dot(adjustments, self.get_distances())) / np.sum(self.get_distances())
         self.optimal_paces = np.full(grades.shape, self.base_pace) + adjustments
         self.optimal_seg_times = np.multiply(self.get_distances(), self.optimal_paces)
@@ -28,57 +27,23 @@ class PacingPlan(ABC):
         self.critical_segments = np.ones(self.current_m_paces).astype(int)*-1
         self.true_paces_abbrev = np.ones(self.current_m_paces).astype(float) * -1 
         self.true_paces_full = np.ones(self.race_course.n_segments).astype(float) * -1
-        self.elapsed_dists = np.ones(self.current_m_paces).astype(float) * -1
         self.true_seg_times = np.ones(self.current_m_paces).astype(float) * -1
-        self.true_total_time = 0
-        self.pace_per_mile = np.ones(int(np.ceil(self.race_course.total_distance)))
-    
-    """Returns amount that we change the pace in minutes / mile for a given elevation grade using
-    Jack Daniels formula"""
-    @staticmethod
-    def get_pace_adjustment_scalar(grade):
-        if grade > 0:
-            return (12 * abs(grade) / 60)
-        else:
-            return (-7 * abs(grade) / 60)
-
-    @classmethod
-    def get_pace_adjustments(cls, grades):
-        vf = np.vectorize(cls.get_pace_adjustment_scalar)
-        return vf(grades)
+        self.elapsed_dists = np.ones(self.current_m_paces).astype(float) * -1
+        self.pace_per_mile = np.ones(int(np.ceil(self.race_course.total_distance))) * -1
     
     def get_distances(self):
         return self.race_course.distances
     
     def get_n_segments(self):
-        return self.race_course.n_segments  
+        return self.race_course.n_segments
 
-    """Calculates pacing plan and populates relevant attributes"""
-    @abstractmethod
-    def calculate_recommendations(self):
-        pass
+    def get_recommended_paces(self):
+        return self.true_paces_full
 
-    @staticmethod
-    def get_pace_display_text(pace):
-        m, s = divmod(pace*60, 60)
-        return (f'{m:.0f}:{int(s):02d}')
-    
-    """Generates a .txt pacing plan that explicitly statements the pace run at every segment"""
-    def gen_full_text(self):
+    def change_total_paces(self, new_m_paces):
+        self.total_paces = new_m_paces
 
-        display_txt = ""
-        for i in range(self.get_n_segments()):
-            lat = self.race_course.lats[i]
-            lon = self.race_course.lons[i]
-            pace = self.true_paces_full[i]
-            dist = self.race_course.distances[i]
-            time = pace * dist
-            elevation = self.race_course.elevations[i] # feet
-        
-            display_txt += f"{i}, {pace}, {lat}, {lon}, {elevation}, {dist}, {time} \n"
-        return display_txt
-    
-    def compute_pace_per_mile(self):
+    def gen_pace_per_mile(self):
         n_mile_markers = math.ceil(self.race_course.total_distance)
         mile_markers = np.argwhere(self.race_course.end_distances - np.floor(self.race_course.end_distances) - self.race_course.distances <= 0)
         mile_markers = mile_markers.reshape(n_mile_markers,)
@@ -109,33 +74,49 @@ class PacingPlan(ABC):
             else:
                 self.pace_per_mile[m] = time / (overflow_distance + np.sum(self.race_course.distances[i:j]))
             total_time += time
+        # assert (np.isclose(total_time, self.true_total_time))
 
-        assert (np.isclose(total_time, self.true_total_time))
+    @abstractmethod
+    def _calculate_recommendations(self, verbose) -> np.ndarray:
+        """
+        Returns pacing plan in the form of an array of paces for each segment.
+        """
+        pass
 
-    def gen_plan_per_mile(self):
+    def calculate_recommendations(self, verbose=False, eps=1e-5):
+        """
+        Calculates the pacing plan and populates the necessary attributes
+        """
+        paces = self._calculate_recommendations(verbose)
+        assert isinstance(paces, np.ndarray), 'Pacing plan must be a numpy array'
+        assert len(paces) == self.get_n_segments(), 'Pacing plan must have a pace for each segment'
+
+        self.true_seg_times = self.get_distances() * paces
+        assert abs(sum(self.true_seg_times) - self.target_time) < eps, f'Total time of pacing plan must equal target time: {sum(self.true_seg_times).f2} = {self.target_time.f2}'
+
+        self.true_paces_full = paces
+        self.true_paces_abbrev = utils.gen_abbrev_paces(paces)
+        self.critical_segments = utils.gen_critical_segments(paces)
+        self.elapsed_dists = utils.gen_elapsed_distances(paces, self.race_course.start_distances, self.race_course.total_distance)
+
+        return paces
+    
+    def gen_full_text(self):
+        """
+        Generates a .txt pacing plan that explicitly statements the pace run at every segment.
+        """
         display_txt = ""
-
-        header = f'{self.race_course.course_name}: {self.target_time} minute plan'
-        display_txt += header + '\n\n'
-
-        for i, pace in enumerate(self.pace_per_mile):
-            lat_lon_txt = ''
-            # if self.race_course is type(racecourse.RealRaceCourse):
-            #     lat_lon_txt = f' @ ({self.race_course.lats[i]},{self.race_course.lons[i]})'
-            total_distance = self.race_course.total_distance
-            if i < np.floor(total_distance):
-                distance = 1
-                time = pace
-            else:
-                distance = total_distance - math.floor(total_distance)
-                time = pace * distance
-            txt = f"{i}: {i} mi \t{self.get_pace_display_text(pace)}/mile for {distance:.2f} mi and {time:.2f} minutes {lat_lon_txt}"
-            display_txt += txt + '\n'
+        for i in range(self.get_n_segments()):
+            lat = self.race_course.lats[i]
+            lon = self.race_course.lons[i]
+            pace = self.true_paces_full[i]
+            dist = self.race_course.distances[i]
+            time = pace * dist
+            elevation = self.race_course.elevations[i] # feet
         
-        display_txt += f"\nTotal time: {self.true_total_time :.2f}"
-
+            display_txt += f"{i}, {pace}, {lat}, {lon}, {elevation}, {dist}, {time} \n"
         return display_txt
-
+    
     def gen_geojson(self, file_path, loop):
         # Initialize the base structure of the GeoJSON
         geojson_data = {
@@ -155,7 +136,7 @@ class PacingPlan(ABC):
             
             pace = self.true_paces_full[start_idx]
             
-            coords = [[seg.start_lon, seg.start_lat, seg.start_ele] for seg in all_segments]
+            coords = [[seg.start_lat, seg.start_lon, seg.start_ele] for seg in all_segments]
             if(i == len(all_changes)-1 and loop):
                 # if last segment and loop is true
                 first_seg = self.race_course.segments[0]
@@ -180,9 +161,11 @@ class PacingPlan(ABC):
             json.dump(geojson_data, geojson_file, indent=4)
         return geojson_data
 
-    """Generates a simplified .txt pacing plan that includes just the different pace segments
-        TODO: rename as gen_plan_per_pace_segment"""
-    def gen_plan_per_pace_segment(self):
+    def gen_abbrev_plan(self):
+        """
+        Generates a simplified .txt pacing plan that includes just the different pace segments.
+        TODO: rename as gen_plan_per_pace_segment
+        """
         display_txt = ""
 
         header = f'{self.race_course.course_name}: {self.target_time} minute plan'
@@ -190,17 +173,41 @@ class PacingPlan(ABC):
 
         for i, pace in enumerate(self.true_paces_abbrev):
             lat_lon_txt = ''
-            if self.race_course is type(racecourse.RealRaceCourse):
+            if self.race_course is type(race_course.RealRaceCourse):
                 lat_lon_txt = f' @ ({self.race_course.lats[i]},{self.race_course.lons[i]})'
             distance_duration = self.elapsed_dists[i]
             start_distance = self.race_course.start_distances[self.critical_segments[i]]
-            txt = f"{i}: {start_distance:.2f} mi\t{self.get_pace_display_text(pace)}/mile for {distance_duration:.2f} mi{lat_lon_txt}"
+            txt = f"{i}: {start_distance:.2f} mi\t{utils.get_pace_display_text(pace)}/mile for {distance_duration:.2f} mi{lat_lon_txt}"
+            display_txt += txt + '\n'
+        
+        display_txt += f"\nTotal time: {self.target_time :.2f}"
+
+        return display_txt
+    
+    def gen_plan_per_mile(self):
+        display_txt = ""
+
+        header = f'{self.race_course.course_name}: {self.target_time} minute plan'
+        display_txt += header + '\n\n'
+
+        for i, pace in enumerate(self.pace_per_mile):
+            lat_lon_txt = ''
+            # if self.race_course is type(racecourse.RealRaceCourse):
+            #     lat_lon_txt = f' @ ({self.race_course.lats[i]},{self.race_course.lons[i]})'
+            total_distance = self.race_course.total_distance
+            if i < np.floor(total_distance):
+                distance = 1
+                time = pace
+            else:
+                distance = total_distance - math.floor(total_distance)
+                time = pace * distance
+            txt = f"{i}: {i} mi \t{self.get_pace_display_text(pace)}/mile for {distance:.2f} mi and {time:.2f} minutes {lat_lon_txt}"
             display_txt += txt + '\n'
         
         display_txt += f"\nTotal time: {self.true_total_time :.2f}"
 
         return display_txt
-    
+
     def gen_pace_chart(self,file_path, incl_opt_paces=False, incl_true_paces=True):
         if not incl_opt_paces and not incl_true_paces:
             raise ValueError("at least one of incl_opt_paces or incl_true_paces must be True")
@@ -214,7 +221,6 @@ class PacingPlan(ABC):
 
         ax.set_xlabel('distance (miles)')
         ax.set_ylabel('elevation (feet)')
-        ax.legend(loc="upper left")
 
         ax2 = ax.twinx()
         ax2.set_ylabel('pace (min/mile)')
@@ -230,20 +236,21 @@ class PacingPlan(ABC):
             for i, xy in enumerate(zip(x, self.true_paces_full)):
                 if i in self.critical_segments:
                     pace = self.true_paces_full[i]
-                    ax2.annotate(f'{self.get_pace_display_text(pace)}', xy, xytext=(10,10), textcoords='offset pixels')
+                    ax2.annotate(f'{utils.get_pace_display_text(pace)}', xy, xytext=(10,10), textcoords='offset pixels')
 
+        fig.legend(loc="upper left", bbox_to_anchor=(0.125, 0.875))
         ax.set_title(f'{self.race_course.course_name} Pacing Plan')
         plt.savefig(file_path, bbox_inches='tight',dpi=300)
-    
+
     def __repr__(self, verbose=True):
-        #TODO: only let this be called if pacing plan has been generated
+        assert self.true_paces_full.all() != -1, "Pacing plan has not been calculated yet"
         if verbose:
             return self.gen_full_text()
         else:
-            return self.gen_plan_per_pace_segment()
-        
+            return self.gen_abbrev_plan()
+
 class PacingPlanBruteForce(PacingPlan):
-    def __init__(self,race_course : racecourse.RaceCourse, target_time, total_paces):
+    def __init__(self,race_course : race_course.RaceCourse, target_time, total_paces):
         super().__init__(race_course, target_time, total_paces)
         n = self.get_n_segments()
         self.MIN_SEGMENT_LENGTH = 5 # TODO: test different values of this parameter; dynamically change its initialization based off the race course
@@ -252,9 +259,11 @@ class PacingPlanBruteForce(PacingPlan):
         self.OPT = np.ones((n, n+1, total_paces)).astype(int)*-1
         self.cached_m_paces = 0
 
-    """Returns the set of indices that represent the segments we change pace on for a pacing plan 
-    for interval [i,k) with [a] pace changes remaining """
     def get_idxs(self,i,k,a, verbose=False):
+        """
+        Returns the set of indices that represent the segments we change pace on for a pacing plan 
+        for interval [i,k) with [a] pace changes remaining.
+        """
         if verbose:
             print(f"range [{i},{k}) with {a} pace changes")
         if a == 0:
@@ -331,112 +340,49 @@ class PacingPlanBruteForce(PacingPlan):
 
         self.current_m_paces = new_m_paces
 
-    def calculate_recommendations(self, verbose=True):
+    def _calculate_recommendations(self, verbose=False):
         if self.current_m_paces > self.cached_m_paces:
             self.calculate_brute_force(verbose)
         self.backtrack_solution()
-        self.full_seg_times = np.multiply(self.true_paces_full, self.race_course.distances)
-        self.compute_pace_per_mile()
-def init_parser() -> argparse.ArgumentParser:
-    '''
-    Initializes the command line flag parser for this file.
+        self.gen_pace_per_mile()
+        return self.true_paces_full
 
-    Flags:
-
-    [REQUIRED]
-    -f, --file  ==> file path
-    -t, --time  ==> time in minutes to complete course
-    -p, --paces ==> total number of paces
-
-    [OPTIONAL]
-    -l, --loop      ==> if the course contains a loop
-    -s, --smoothen  ==> if the course should be smoothened
-    -r              ==> if a randomly generated course should be used
-    -h              ==> opens help menu
-    '''
-    
-    parser = argparse.ArgumentParser()
-    parser.add_argument("-f", "--file", help="file path of the gpx file to be parsed", required=True)
-    parser.add_argument("-t", "--time", type=int, help="time to complete course in minutes", required=True)
-    parser.add_argument("-p", "--paces", type=int, help="the total number of paces", required=True)
-
-    parser.add_argument("-l", "--loop", action="store_true", help="include this flag if the course contains a loop")
-    parser.add_argument("-s", "--smoothen", help="include if the course should be smoothened. running_avg, loess")
-    parser.add_argument("-r", action="store_true", help="include this flag if you want a random course")
-
-    return parser
-
-def main():
-    parser = init_parser()
-    args = parser.parse_args()
-
-    if args.r:
-        raise RuntimeError("unimplemented")
-
-    file_path = args.file
-    use_loop = args.loop
-    use_smoothing = args.smoothen
-
-    if len(file_path) == 0 or args.r:
-
-        print("\nGenerating Random Course\n")
-        n_segments = int(input('n_segments: \t\t\t'))
-        distance = float(input('distance (miles): \t\t'))
-        course_name = f'random {distance:.1f}'
-        course = racecourse.RandomRaceCourse(course_name, n_segments, distance, use_smoothing=True)
-        file_path = 'data/random/'
-
-    else:
-        course_name = os.path.basename(file_path).split('.')[0]
-        course = racecourse.RealRaceCourse(course_name, file_path)
-
-    if args.smoothen:
-        course.smoothen_segments(args.smoothen)
-
-    print(f'\n{str(course)}')
-
-    directory = os.path.dirname(file_path)+'/'+course_name +'/'
-    if not os.path.exists(directory):
-        os.makedirs(directory)
-
-    plot_path = directory+f'{course_name} {course.n_segments} segs.jpg'
-
-    try:
-        course.gen_course_plot(plot_path)
-    except Exception as e:
-        print(plot_path)
-        raise(e)
-    
-    print('\nCreating Pacing Plan\n')
-    target_time = args.time
-    current_m_paces = args.paces
-    plan = PacingPlanBruteForce(course, target_time, current_m_paces)
-
-    repeat = True
-    is_first_iter = True
-
-    while repeat:
-
-        if not is_first_iter:
-            new_m_paces = input("\nInput number of paces: ")
-            plan.change_total_paces(int(new_m_paces))
-            current_m_paces = new_m_paces
+class PacingPlanLP(PacingPlan):
+    def __init__(self, race_course, target_time, total_paces):
+        super().__init__(race_course, target_time, total_paces)
         
-        plan_identifier = f'{target_time:.0f}min_{current_m_paces}p_{course.n_segments}'
-
-        print('\nRunning Brute Force Algorithm\n')
-        plan.calculate_recommendations(verbose=True)
-        pace_plot_file_path = directory + plan_identifier + '.jpg'
-        geojson_file_path   = directory + plan_identifier + '.json'
-        pace_plan_file_path = directory + plan_identifier + '.txt'
-        plan.gen_pace_chart(pace_plot_file_path, incl_opt_paces=True, incl_true_paces=True)
-        plan.gen_geojson(geojson_file_path, use_loop)
+    def formulate_lp_problem(self, M=1):
+        n_segments = self.get_n_segments()
+        paces = cp.Variable(n_segments)
+        changes = cp.Variable(n_segments-1, integer=True)
+        absolutes = cp.Variable(n_segments)
         
-        with open(pace_plan_file_path, 'w') as f:
-            f.write(str(plan))
+        objective = cp.Minimize(cp.sum(absolutes))
 
-        repeat = bool(int(input('\nCreate another pace plan? 0/1\t')))
-        is_first_iter = False
+        constraints = [
+            paces @ self.get_distances() == self.target_time,
+            paces >= 0,
+            changes >= 0,
+            changes <= 1,
+            cp.sum(changes) == self.current_m_paces - 1,
+            absolutes >= paces - (self.optimal_paces),
+            absolutes >= (self.optimal_paces) - paces
+        ]
+        constraints += [M*changes[i] >= paces[i+1] - paces[i] for i in range(n_segments-1)]
+        constraints += [M*changes[i] >= paces[i] - paces[i+1] for i in range(n_segments-1)]
         
-if __name__ == '__main__':
-    main()
+        return cp.Problem(objective, constraints)
+
+    def solve_lp_problem(self, verbose):
+        problem = self.formulate_lp_problem()
+        problem.solve(solver=cp.GUROBI)
+        if problem.status == cp.OPTIMAL:
+            if verbose:
+                print(f"Linear Programming Algorithm Run Successfully")
+            self.true_paces_full = problem.variables()[1].value
+        else:
+            raise ValueError("LP problem is infeasible")
+
+    def _calculate_recommendations(self, verbose):
+        self.solve_lp_problem(verbose)
+        return self.true_paces_full

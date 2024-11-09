@@ -1,25 +1,10 @@
 import gpxpy
 import gpx_parser
 import numpy as np
-import matplotlib
-from gpx_parser import Segment
-from utils import cprint
+import matplotlib.pyplot as plt
 import math
-from enum import Enum
-
-class Conversions(Enum):
-    METERS_TO_MILES = 0.0006213712
-    METERS_TO_FEET = 3.28084
-    MILES_TO_FEET = 5280
-    MILES_TO_METERS = 1609.34
-    FEET_TO_MILES = 0.000189394
-    FEET_TO_METERS = 0.3048
-    METERS_TO_KM = 1000
-    KM_TO_METERS = 0.001
-
-class Unit(Enum):
-    METRIC = 1
-    IMPERIAL = 2
+from gpx_parser import Segment
+from utils import cprint, Conversions, Unit
 
 # TODO: Remove hard-coded conversions to feet and miles
 # elevation data is stored as feet
@@ -125,24 +110,25 @@ class RaceCourse:
         else:
             raise RuntimeError(f"Unrecognized smmothening argument: {smoothen}!")
 
-        
-
-
-    
     def gen_course_plot(self, file_path):
-        fig,ax = matplotlib.pyplot.subplots()
+        fig,ax = plt.subplots()
         fig.set_figwidth(20)
+        
         distances = np.insert(self.end_distances, 0,0)
         full_elevations = np.append(self.elevations, self.end_elevations[-1])
+        
         ax.plot(distances, full_elevations, label ='elevation', color='blue')
         ax.set_xlabel('distance (miles)')
         ax.set_ylabel('elevation (feet)')
+        
         ax2 = ax.twinx()
         ax2.set_ylabel('grade (%)')
         full_grades = np.append(self.grades, self.grades[-1])
-        ax2.plot(distances, full_grades, label='grade', color='red')
+        ax2.step(distances, full_grades, label='grade', color='purple', where='post', alpha=0.4)
+        
+        fig.legend(loc="upper left", bbox_to_anchor=(0.125, 0.875))
         ax.set_title(self.course_name)
-        matplotlib.pyplot.savefig(file_path, bbox_inches='tight',dpi=300)
+        plt.savefig(file_path, bbox_inches='tight',dpi=300)
 
     # TODO: hard coded smoothing values 
     # TODO: use more sophisticated smoothing method

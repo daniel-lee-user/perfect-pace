@@ -4,7 +4,7 @@ Repository for the perfect pace project
 
 # Usage
 
-Run this file using `python dp_alg.py [FLAGS]`. Use `python dp_alg.py -h` for help on usage.
+Run this file using `python main.py [FLAGS]`. Use `python main.py -h` for help on usage.
 
 Flags:
 
@@ -13,6 +13,7 @@ Flags:
 -f, --file  ==> file path
 -t, --time  ==> time in minutes to complete course
 -p, --paces ==> total number of paces
+-m, --method    ==> pacing plan method to use ("brute_force", "linear_programming")
 
 [OPTIONAL]
 -l, --loop      ==> if the course contains a loop
@@ -21,4 +22,4 @@ Flags:
 -h              ==> opens help menu
 ```
 
-Example: `python dp_alg.py -f "data/Lakefront-Loops-5K.gpx" -t 30 -p 8`
+Example: `python main.py -f "data/Lakefront-Loops-5K.gpx" -t 20 -p 6 -m "brute_force"`

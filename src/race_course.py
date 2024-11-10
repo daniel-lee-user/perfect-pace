@@ -175,16 +175,38 @@ class RealRaceCourse(RaceCourse):
         self.start_distances[0] = 0
         self.total_distance = self.end_distances[-1]
 
-        valid_elevations = elevations[np.append(valid_indices, True)]
-        self.elevations = valid_elevations[:-1]
-        self.elevations_metric = self.elevations
-        self.end_elevations = valid_elevations[1:]
-        self.elevation_changes = self.end_elevations - self.elevations
+        self.full_elevations_uninterp = elevations[np.append(valid_indices, True)]
+
+        self.interpolate() # takes cares of distances and elevations
 
         calculate_grade = np.vectorize(RealRaceCourse.calculate_grade_scalar)
         self.grades = calculate_grade(self.elevation_changes, self.distances)
 
         self.convert_metric_to_imperial()
+
+    def interpolate(self, x_resolution=200.):
+        new_steps = int(self.total_distance / x_resolution)
+        even_distances = np.arange(new_steps+1)*x_resolution
+        even_distances[0] = self.total_distance
+        even_distances = np.roll(even_distances, -1)
+
+        self.distances = np.full(new_steps+1, x_resolution)
+        self.distances[-1] = self.total_distance % x_resolution 
+        
+        # elevations
+        print(len(self.end_distances))
+        print(len(self.elevations))
+        self.elevations = np.interp(even_distances, self.end_distances, self.full_elevations_uninterp[:-1])
+        self.end_elevations = np.roll(self.elevations, -1)
+        self.end_elevations[-1] = self.full_elevations_uninterp[-1]
+        
+        # finish updating distances
+        self.end_distances = even_distances
+        self.n_segments = new_steps + 1 
+        self.start_distances = np.roll(self.end_distances, 1)
+        self.start_distances[0] = 0
+
+        # TODO: interpolate latitude and longitude
 
     def parse_gpx(self):
         lats = []

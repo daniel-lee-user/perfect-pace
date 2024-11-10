@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GPX Map</title>
+    <link rel="stylesheet" href="node_modules/leaflet/dist/leaflet.css" />
+    <link rel="stylesheet" href="node_modules/leaflet.elevation/dist/Leaflet.Elevation-0.0.2.css" />
+    <link rel="stylesheet" href="src/styles2.css" />
+    <script src="node_modules/leaflet/dist/leaflet.js"></script>
+    <script src="http://d3js.org/d3.v3.min.js" charset="utf-8"></script>
+    <script src="//api.tiles.mapbox.com/mapbox.js/plugins/leaflet-omnivore/v0.3.1/leaflet-omnivore.min.js"></script>
+    <script src="src/elevationgraph2.js"></script>
+    <script src="src/mapscript.js" defer></script>
+</head>
+
+<body>
+    <div class="container">
+        <div id="table-container">
+            <h3>Segment Data
+                <select id="segment-select" class="segment-select">
+                    <option value="segments">Segments</option>
+                    <option value="miles">Miles</option>
+                </select>
+                <select id="unit-select" class="unit-select">
+                    <option value="imperial">Imperial</option>
+                    <option value="metric">Metric</option>
+                </select>
+            </h3>
+            <table id="data-table" border="1">
+                <tr>
+                    <th>Segment</th>
+                    <th>Distance (mi)</th>
+                    <th>Pace (/mile)</th>
+                    <th>Segment Length (mi)</th>
+                </tr>
+            </table>
+        </div>
+        <div id="map"></div>
+    </div>
+</body>
+
+</html>

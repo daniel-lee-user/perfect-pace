@@ -95,7 +95,8 @@ class PacingPlan(ABC):
         assert len(paces) == self.get_n_segments(), 'Pacing plan must have a pace for each segment'
 
         self.true_seg_times = self.get_distances() * paces
-        assert abs(sum(self.true_seg_times) - self.target_time) < eps, f'Total time of pacing plan must equal target time: {sum(self.true_seg_times):.3f} = {self.target_time:.3f}'
+        self.true_total_time = sum(self.true_seg_times)
+        assert abs(self.true_total_time - self.target_time) < eps, f'Total time of pacing plan must equal target time: {self.true_total_time:.3f} = {self.target_time:.3f}'
 
         self.true_paces_full = paces
         self.true_paces_abbrev = utils.gen_abbrev_paces(paces)
@@ -379,4 +380,24 @@ class PacingPlanBruteForce(PacingPlan):
             self.calculate_brute_force(verbose)
         self.backtrack_solution()
         self.gen_pace_per_mile(self.true_paces_full)
+        return self.true_paces_full
+
+class PacingPlanAvgPacePerMile(PacingPlan):
+    def __init__(self, race_course, target_time, total_paces):
+        super().__init__(race_course, target_time, total_paces)
+
+    def _calculate_recommendations(self, verbose):
+        self.gen_pace_per_mile(self.optimal_paces)
+        for i in range(self.get_n_segments()):
+            mile = int(self.race_course.start_distances[i])
+            self.true_paces_full[i] = self.pace_per_mile[mile]
+        return self.true_paces_full
+
+class PacingPlanAvgPace(PacingPlan):
+    def __init__(self, race_course, target_time, total_paces):
+        super().__init__(race_course, target_time, total_paces)
+
+    def _calculate_recommendations(self, verbose):
+        avg_pace = self.target_time / self.race_course.total_distance
+        self.true_paces_full[:] = avg_pace
         return self.true_paces_full

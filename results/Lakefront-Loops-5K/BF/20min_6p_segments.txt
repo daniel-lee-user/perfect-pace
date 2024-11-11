@@ -1,0 +1,10 @@
+Lakefront-Loops-5K: 20 minute plan
+
+0: 0.00 mi	6:28/mile for 1.23 mi
+1: 1.23 mi	7:15/mile for 0.08 mi
+2: 1.30 mi	6:11/mile for 0.20 mi
+3: 1.50 mi	6:27/mile for 0.39 mi
+4: 1.89 mi	6:35/mile for 0.07 mi
+5: 1.96 mi	6:27/mile for 1.13 mi
+
+Total time: 20.00

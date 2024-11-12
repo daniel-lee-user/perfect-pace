@@ -48,6 +48,26 @@ class Segment:
                f"Grade: {self.grade:.2f}%"
 
 def parse_gpx(file_path):
+        lats = []
+        lons = []
+        elevations = []
+
+        with open(file_path, 'r') as gpx_file:
+            gpx = gpxpy.parse(gpx_file)
+            for track in gpx.tracks:
+                for segment in track.segments:
+                    for i in range(len(segment.points)):
+                        point = segment.points[i]
+                        if point.latitude is None or point.longitude is None or point.elevation is None:
+                            raise ValueError(f"some of the trackpoint info is missing: {point}")
+                        
+                        lats.append(point.latitude)
+                        lons.append(point.longitude)
+                        elevations.append(point.elevation)
+
+        return lats, lons, elevations
+
+def parse_gpx_DEPRECATED(file_path):
     with open(file_path, 'r') as gpx_file:
         gpx = gpxpy.parse(gpx_file)
         segments = []
@@ -73,7 +93,7 @@ def main():
         sys.exit(1)
 
     file_path = sys.argv[1]
-    segments = parse_gpx(file_path)
+    segments = parse_gpx_DEPRECATED(file_path)
 
     for segment in segments:
         print(segment)

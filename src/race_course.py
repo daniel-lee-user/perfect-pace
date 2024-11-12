@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import math
 from gpx_parser import Segment
 from scipy import ndimage
-from utils import Conversions, Unit, SegmentType
+from utils import Conversions, Unit, SegmentType, calculate_grade, calculate_distance
 import segment_view
 
 import os
@@ -18,10 +18,6 @@ class RaceCourse:
     def __init__(self, name):
         self.course_name = name
         self.segments: list[Segment] = None  # list of Segment objects
-
-    @staticmethod
-    def calculate_grade_scalar(elevation_change, distance):
-        return (elevation_change / distance) * 100
     
     # TODO find some better arg values for smoothening function...
     def smoothen_segments(self, smoothen: str = "running_avg", *args):
@@ -105,16 +101,6 @@ class RaceCourse:
         fig.legend(loc="upper left", bbox_to_anchor=(0.125, 0.875))
         ax.set_title(self.course_name)
         plt.savefig(file_path, bbox_inches='tight',dpi=300)
-
-    # TODO: hard coded smoothing values 
-    # TODO: use more sophisticated smoothing method
-    def smooth_attribute(self, attribute, param=10):
-        smoothing_factor = max(int(self.n_segments/param), 1)
-        smoothing_factor -= smoothing_factor % 2 == 0
-        pad_width = int(smoothing_factor / 2)
-        padded_attribute = np.pad(attribute, pad_width, 'edge')
-        result = np.convolve(padded_attribute, np.ones(smoothing_factor), 'valid') / smoothing_factor
-        return result
     
     def __repr__(self):
         unit_txt = 'miles' if self.units == Unit.IMPERIAL else 'meters'
@@ -124,19 +110,16 @@ class RaceCourse:
 
 class RealRaceCourse(RaceCourse):
 
-    def __init__(self, name, file_path, N_SEGMENTS=300):
+    def __init__(self, name, file_path, N_SEGMENTS=100):
         super().__init__(name)
 
-        self.segments = gpx_parser.parse_gpx(file_path) # remove after all references to segments are removed
+        self.segments = gpx_parser.parse_gpx_DEPRECATED(file_path) # TODO: remove after all references to segments are removed
         self.file_path = file_path
-
-        self.calculate_distance = np.vectorize(RealRaceCourse.calculate_distance_scalar)
-        self.calculate_grade_scalar = np.vectorize(RealRaceCourse.calculate_grade_scalar)
         
-        lats, lons, raw_elevations = self.parse_gpx()
+        lats, lons, raw_elevations = gpx_parser.parse_gpx(file_path)
         lats = np.array(lats)
         lons = np.array(lons)
-        raw_seg_lengths = self.calculate_distance(lats[:-1], lons[:-1], lats[1:], lons[1:])
+        raw_seg_lengths = calculate_distance(lats[:-1], lons[:-1], lats[1:], lons[1:])
         raw_elevations = np.array(raw_elevations)
         
         if np.isnan(raw_elevations).any():
@@ -157,10 +140,7 @@ class RealRaceCourse(RaceCourse):
     
     def change_view(self, view: segment_view.SegmentView):
         self.n_segments = view.n_segments
-        if isinstance(view, segment_view.SegmentViewMetric):
-            self.units = Unit.METRIC
-        else:
-            self.units = Unit.IMPERIAL
+        self.units = Unit.METRIC if isinstance(view, segment_view.SegmentViewMetric) else Unit.IMPERIAL
         self.lats = view.lats
         self.lons = view.lons
         self.distances = view.segment_lengths 
@@ -173,41 +153,6 @@ class RealRaceCourse(RaceCourse):
         self.elevation_changes = view.elevation_changes
         self.grades = view.grades
         self.current_view = view
-
-    def parse_gpx(self):
-        lats = []
-        lons = []
-        elevations = []
-
-        with open(self.file_path, 'r') as gpx_file:
-            gpx = gpxpy.parse(gpx_file)
-            for track in gpx.tracks:
-                for segment in track.segments:
-                    for i in range(len(segment.points)):
-                        point = segment.points[i]
-                        if point.latitude is None or point.longitude is None or point.elevation is None:
-                            raise ValueError(f"some of the trackpoint info is missing: {point}")
-                        
-                        lats.append(point.latitude)
-                        lons.append(point.longitude)
-                        elevations.append(point.elevation)
-
-        return lats, lons, elevations
-
-    @staticmethod
-    def calculate_grade_scalar(elevation_change, distance):
-        return elevation_change / distance * 100
-
-    @staticmethod
-    def calculate_distance_scalar(start_lat, start_lon, end_lat, end_lon):
-        radius = 6371
-        lat1, lon1, lat2, lon2 = map(math.radians, [start_lat, start_lon, end_lat, end_lon])
-        dlat = lat2 - lat1
-        dlon = lon2 - lon1
-        a = math.sin(dlat / 2)**2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2)**2
-        c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
-        distance = radius * c * 1000
-        return distance
 
     def convert_metric_to_imperial(self):
         if self.units == Unit.IMPERIAL:
@@ -224,6 +169,16 @@ class RealRaceCourse(RaceCourse):
         self.units = Unit.IMPERIAL
 
 class RandomRaceCourse(RaceCourse):
+    # TODO: hard coded smoothing values 
+    # TODO: use more sophisticated smoothing method
+    def smooth_attribute(self, attribute, param=10):
+        smoothing_factor = max(int(self.n_segments/param), 1)
+        smoothing_factor -= smoothing_factor % 2 == 0
+        pad_width = int(smoothing_factor / 2)
+        padded_attribute = np.pad(attribute, pad_width, 'edge')
+        result = np.convolve(padded_attribute, np.ones(smoothing_factor), 'valid') / smoothing_factor
+        return result
+    
     def apply_smoothing(self):
         self.elevation_changes = self.smooth_attribute(self.elevation_changes, param=10)
 
@@ -247,8 +202,7 @@ class RandomRaceCourse(RaceCourse):
             self.apply_smoothing()
 
         self.distances = self.distances * total_dist / (sum(self.distances))
-        grade_vf = np.vectorize(self.calculate_grade_scalar)
-        self.grades = grade_vf(self.elevation_changes * Conversions.FEET_TO_MILES.value ,self.distances) 
+        self.grades = calculate_grade(self.elevation_changes * Conversions.FEET_TO_MILES.value ,self.distances) 
         self.total_distance = total_dist
         self.end_distances = np.cumsum(self.distances)
         self.start_distances = np.roll(self.end_distances,1)
@@ -267,7 +221,9 @@ class RandomRaceCourse(RaceCourse):
         self.end_elevations -= min_val
     
 def main():
-    for course_name in ['FH-Fox', 'boston']:# 'wineglass', 'lakefront', 'staten-half-elev']:
+    courses = ['FH-Fox', 'boston' 'wineglass', 'lakefront', 'staten-half-elev']
+
+    for course_name in courses[:2]:
         file_path = f'data/{course_name}.gpx'
         course_name = os.path.basename(file_path).split('.')[0]
         for N_SEGMENTS in [125, 250, 500, 1000]:

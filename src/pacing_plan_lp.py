@@ -34,7 +34,7 @@ class PacingPlanLP(PacingPlan, ABC):
         self.define_variables()
         objective = self.formulate_objective()
         constraints = [
-            self.paces @ self.get_distances() == self.target_time,
+            self.paces @ self.get_segment_lengths() == self.target_time,
             self.paces >= 0,
         ]
         constraints += self.formulate_constraints()

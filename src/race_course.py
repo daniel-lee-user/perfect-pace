@@ -137,7 +137,7 @@ class RealRaceCourse(RaceCourse):
         self.units = Unit.METRIC if isinstance(view, segment_view.SegmentViewMetric) else Unit.IMPERIAL
         self.lats = view.lats
         self.lons = view.lons
-        self.distances = view.segment_lengths 
+        self.segment_lengths = view.segment_lengths 
         self.start_distances = view.start_distances
         self.end_distances = view.end_distances
         self.total_distance = view.total_distance
@@ -151,7 +151,7 @@ class RealRaceCourse(RaceCourse):
     def convert_metric_to_imperial(self):
         if self.units == Unit.IMPERIAL:
             return
-        self.distances = self.distances * Conversions.METERS_TO_MILES.value 
+        self.segment_lengths = self.segment_lengths * Conversions.METERS_TO_MILES.value 
         self.end_distances = self.end_distances * Conversions.METERS_TO_MILES.value
         self.start_distances =   self.start_distances * Conversions.METERS_TO_MILES.value
         self.total_distance = self.total_distance * Conversions.METERS_TO_MILES.value

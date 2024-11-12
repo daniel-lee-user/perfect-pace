@@ -18,9 +18,9 @@ class PacingPlan(ABC):
         self.current_m_paces = total_paces
         grades = self.race_course.grades
         adjustments = utils.get_pace_adjustments(grades)
-        self.base_pace = (self.target_time - np.dot(adjustments, self.get_distances())) / np.sum(self.get_distances())
+        self.base_pace = (self.target_time - np.dot(adjustments, self.get_segment_lengths())) / np.sum(self.get_segment_lengths())
         self.optimal_paces = np.full(grades.shape, self.base_pace) + adjustments
-        self.optimal_seg_times = np.multiply(self.get_distances(), self.optimal_paces)
+        self.optimal_seg_times = np.multiply(self.get_segment_lengths(), self.optimal_paces)
 
         # Populated after pace recommendations are calculated
         self.critical_segments = np.ones(self.current_m_paces).astype(int)*-1
@@ -31,8 +31,8 @@ class PacingPlan(ABC):
         self.pace_per_mile = np.ones(int(np.ceil(self.race_course.total_distance))) * -1
         self.true_total_time = 0
         
-    def get_distances(self):
-        return self.race_course.distances
+    def get_segment_lengths(self):
+        return self.race_course.segment_lengths
     
     def get_n_segments(self):
         return self.race_course.n_segments
@@ -48,7 +48,7 @@ class PacingPlan(ABC):
         assert isinstance(paces, np.ndarray), 'Pacing plan must be a numpy array'
 
         n_mile_markers = math.ceil(self.race_course.total_distance)
-        mile_markers = np.argwhere(self.race_course.end_distances - np.floor(self.race_course.end_distances) - self.race_course.distances <= 0)
+        mile_markers = np.argwhere(self.race_course.end_distances - np.floor(self.race_course.end_distances) - self.race_course.segment_lengths <= 0)
         mile_markers = mile_markers.reshape(n_mile_markers,)
         overflow = 0
         total_time = 0
@@ -63,11 +63,11 @@ class PacingPlan(ABC):
             else:
                 j = mile_markers[m+1]
 
-            time = overflow + np.dot(self.race_course.distances[i:j], paces[i:j])
+            time = overflow + np.dot(self.race_course.segment_lengths[i:j], paces[i:j])
 
             if m != n_mile_markers - 1:
                 overflow_distance = self.race_course.end_distances[j] - (m+1) # distance from last segment that we exclude
-                incl_distance = self.race_course.distances[j] - overflow_distance
+                incl_distance = self.race_course.segment_lengths[j] - overflow_distance
                 incl_time = incl_distance*paces[j]
                 overflow = overflow_distance * paces[j]
                 time += incl_time
@@ -75,7 +75,7 @@ class PacingPlan(ABC):
                 self.pace_per_mile[m] = time
 
             else:
-                self.pace_per_mile[m] = time / (overflow_distance + np.sum(self.race_course.distances[i:j]))
+                self.pace_per_mile[m] = time / (overflow_distance + np.sum(self.race_course.segment_lengths[i:j]))
             total_time += time
         return self.pace_per_mile
 
@@ -94,7 +94,7 @@ class PacingPlan(ABC):
         assert isinstance(paces, np.ndarray), 'Pacing plan must be a numpy array'
         assert len(paces) == self.get_n_segments(), 'Pacing plan must have a pace for each segment'
 
-        self.true_seg_times = self.get_distances() * paces
+        self.true_seg_times = self.get_segment_lengths() * paces
         self.true_total_time = sum(self.true_seg_times)
         assert abs(self.true_total_time - self.target_time) < eps, f'Total time of pacing plan must equal target time: {self.true_total_time:.3f} = {self.target_time:.3f}'
 
@@ -116,7 +116,7 @@ class PacingPlan(ABC):
             lat = self.race_course.lats[i]
             lon = self.race_course.lons[i]
             pace = self.true_paces_full[i]
-            dist = self.race_course.distances[i]
+            dist = self.race_course.segment_lengths[i]
             time = pace * dist
             elevation = self.race_course.start_elevations[i] # feet
         
@@ -407,7 +407,7 @@ class PacingPlanBF(PacingPlan):
             # TODO: rewrite using numpy vectorized functions
             for i in range(n):
                 for j in range(i+1, n+1):
-                    self.WP[i,j] = np.dot(self.optimal_paces[i:j], self.get_distances()[i:j] / sum(self.get_distances()[i:j]))
+                    self.WP[i,j] = np.dot(self.optimal_paces[i:j], self.get_segment_lengths()[i:j] / sum(self.get_segment_lengths()[i:j]))
                     loss = np.sum(self.loss_method(self.optimal_paces[i:j]-self.WP[i,j]))
                     self.LOSS[i,j,0] = loss
 

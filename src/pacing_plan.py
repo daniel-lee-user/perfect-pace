@@ -1,5 +1,4 @@
 import numpy as np
-import cvxpy as cp
 import matplotlib.pyplot as plt
 import race_course
 from abc import ABC, abstractmethod
@@ -30,7 +29,8 @@ class PacingPlan(ABC):
         self.true_seg_times = np.ones(self.current_m_paces).astype(float) * -1
         self.elapsed_dists = np.ones(self.current_m_paces).astype(float) * -1
         self.pace_per_mile = np.ones(int(np.ceil(self.race_course.total_distance))) * -1
-    
+        self.true_total_time = 0
+        
     def get_distances(self):
         return self.race_course.distances
     
@@ -132,20 +132,23 @@ class PacingPlan(ABC):
         all_changes = self.critical_segments
         if(all_changes[len(all_changes)-1] != self.get_n_segments()-1):
             all_changes = np.append(all_changes, self.get_n_segments()-1)
-        start_idx = all_changes[0] # assuming changes always starts at 0
-        for i in range(1, len(all_changes)):
-            all_segments = []
-            for j in range(start_idx, all_changes[i]+1):
-                all_segments.append(self.race_course.segments[j])
-            
-            pace = self.true_paces_full[start_idx]
-            
-            coords = [[seg.start_lon, seg.start_lat, seg.start_ele] for seg in all_segments]
-            if(i == len(all_changes)-1 and loop):
-                # if last segment and loop is true
-                first_seg = self.race_course.segments[0]
-                coords.append([first_seg.start_lon, first_seg.start_lat, first_seg.start_ele])
 
+        for start, end in zip(all_changes, all_changes[1:]):
+            pace = self.true_paces_full[start]
+            lats = self.race_course.lats[start:end+1]
+            lons = self.race_course.lons[start:end+1]
+            elevations = self.race_course.elevations[start:end+1]
+
+            coords = np.stack((lons,lats,elevations))
+            coords = coords.T.tolist()
+
+            if(end == self.get_n_segments()-1):
+                # TODO: uncomment this: it adds the end elevation of the last segment
+                # coords.append([self.race_course.lons[-1],self.race_course.lats[-1],self.race_course.elevations[-1]])
+                if loop:
+                    # add start elevation of the entire loop ... double-check: could this be redundant with the value at -1? 
+                    coords.append([self.race_course.lons[0],self.race_course.lats[0],self.race_course.elevations[0]])
+            
             # Create a feature for each segment
             feature = {
                 "type": "Feature",
@@ -160,7 +163,7 @@ class PacingPlan(ABC):
             
             # Append the feature to the features array in GeoJSON
             geojson_data["features"].append(feature)
-            start_idx = all_changes[i]
+
         with open(file_path, 'w') as geojson_file:
             json.dump(geojson_data, geojson_file, indent=4)
         return geojson_data
@@ -284,14 +287,13 @@ class PacingPlan(ABC):
         else:
             return self.gen_abbrev_plan()
 
-class PacingPlanBruteForce(PacingPlan):
+class PacingPlanBF(PacingPlan):
     def __init__(self,race_course : race_course.RaceCourse, target_time, total_paces):
         super().__init__(race_course, target_time, total_paces)
         n = self.get_n_segments()
         self.MIN_SEGMENT_LENGTH = 5 # TODO: test different values of this parameter; dynamically change its initialization based off the race course
         self.WP = np.zeros((n,n+1))
         self.LOSS = np.ones((n, n+1, total_paces)) * np.inf
-        self.loss_method = np.square # TODO: change to be included in flags
         self.OPT = np.ones((n, n+1, total_paces)).astype(int)*-1
         self.cached_m_paces = 0
 
@@ -383,6 +385,16 @@ class PacingPlanBruteForce(PacingPlan):
         self.backtrack_solution()
         self.gen_pace_per_mile(self.true_paces_full)
         return self.true_paces_full
+
+class PacingPlanBFSquare(PacingPlanBF):
+    def __init__(self, race_course : race_course.RaceCourse, target_time, total_paces):
+        super().__init__(race_course, target_time, total_paces)
+        self.loss_method = np.square
+
+class PacingPlanBFAbsolute(PacingPlanBF):
+    def __init__(self, race_course : race_course.RaceCourse, target_time, total_paces):
+        super().__init__(race_course, target_time, total_paces)
+        self.loss_method = np.abs
 
 class PacingPlanAvgPacePerMile(PacingPlan):
     def __init__(self, race_course, target_time, total_paces):

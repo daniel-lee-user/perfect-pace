@@ -3,6 +3,8 @@ document.getElementById('fileInput').addEventListener('change', async function (
     const paceChanges = document.getElementById('paceChanges').value;
     const time = document.getElementById('time').value;
     const isLoop = document.getElementById('loops').checked;
+    const algorithm = document.getElementById('plan-type').value;
+    const filename = fileInput.files[0].name;
     console.log("UPLOAD");
     if (!fileInput.files.length) {
         document.getElementById('errorMessage').innerText = "Please select a GPX file.";
@@ -40,6 +42,7 @@ document.getElementById('fileInput').addEventListener('change', async function (
     formData.append('paces', paceChanges);
     formData.append('time', time);
     formData.append('loop', isLoop);
+    formData.append('alg', algorithm);
 
     // Check if the file extension is .gpx
     const fileExtension = fileInput.files[0].name.split('.').pop().toLowerCase();
@@ -64,31 +67,65 @@ document.getElementById('fileInput').addEventListener('change', async function (
         const jsonFile = await zip.file(/.*\.json$/)[0]?.async("text");
 
         // Extract the miles CSV file
-        const mileCsvFile = await zip.file(/.*_miles\.csv$/)[0]?.async("text");
+        const mileJSON = await zip.file(/.*_miles\.json$/)[0]?.async("text");
 
         // Extract the regular segments TXT file
-        const regularTxtFile = await zip.file(/.*_segments\.txt$/)[0]?.async("text");
-
+        const segmentsJSON = await zip.file(/.*_segments\.json$/)[0]?.async("text");
         const jsonData = JSON.parse(jsonFile);
 
         // right now I save the geojson data and text file content to local storage, might 
         // need to change it if this related data becomes > 5MB
         modifyGeoJSON(jsonData);
         // save in localstorage to pass to map
-        sessionStorage.setItem('textFileContent', regularTxtFile);
-        sessionStorage.setItem('mileTextContent', mileCsvFile);
-        console.log(mileCsvFile);
-        console.log(regularTxtFile)
+        console.log(segmentsJSON);
+        sessionStorage.setItem('segments', segmentsJSON);
+        sessionStorage.setItem('miles', mileJSON);
+
+        await deleteFile(paceChanges, time, algorithm, filename);
+        //console.log(mileJSON);
+        //console.log(segmentsJSON)
     } catch (error) {
         console.error('Error:', error);
         // only feed in regular gpx file if algorithm fails for some reason
         const geojson = toGeoJSON.gpx(xmlDoc);
         modifyGeoJSON(geojson);
     } finally {
+        sessionStorage.setItem('filename', filename);
         document.getElementById('loadingScreen').style.display = 'none';
         fileInput.value = '';
         window.location.href = 'map.html';
     }
+
+    function deleteFile(paces, time, algorithm, filename) {
+        // Construct the request URL (assuming the route for deletion is '/delete')
+        const url = 'http://127.0.0.1:5000/delete';
+
+        // Send a DELETE request with JSON payload
+        fetch(url, {
+            method: 'DELETE', // Specify DELETE method
+            headers: {
+                'Content-Type': 'application/json', // Set content type to JSON
+            },
+            body: JSON.stringify({
+                "paces": paces,         // Pace value
+                "time": time,           // Time value
+                "alg": algorithm, // Algorithm type (e.g., 'DP' or 'LP')
+                "filename": filename    // Filename to delete
+            })
+        })
+            .then(response => response.json()) // Parse the response as JSON
+            .then(data => {
+                if (data.success) {
+                    console.log('File deleted successfully');
+                } else {
+                    console.error('Error deleting file:', data.error);
+                }
+            })
+            .catch(error => {
+                console.error('Error during DELETE request:', error);
+            });
+    }
+
 
     function modifyGeoJSON(geojson) {
         // Check if we have at least one feature

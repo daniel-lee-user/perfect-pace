@@ -12,10 +12,10 @@ window.addEventListener('load', () => {
         geojson.features.forEach((feature, index) => {
             let coordinates = feature.geometry.coordinates;
             let startPoint = coordinates[0];
-            L.marker([startPoint[1], startPoint[0]]).addTo(map).bindPopup(`Start of Segment ${index + 1}: Pace = ${feature.properties.pace.toFixed(4)}`);
+            L.marker([startPoint[1], startPoint[0]]).addTo(map).bindPopup(`Start of Segment ${index + 1}: Pace = ${feature.properties.pace.toFixed(2)} min/mi`);
             if (index == geojson.features.length - 1) {
                 let endPoint = coordinates[coordinates.length - 1];
-                L.marker([endPoint[1], endPoint[0]]).addTo(map).bindPopup(`End of Segment ${index + 1}: Pace = ${feature.properties.pace.toFixed(4)}`);
+                L.marker([endPoint[1], endPoint[0]]).addTo(map).bindPopup(`End of Segment ${index + 1}: Pace = ${feature.properties.pace.toFixed()} min/mi`);
             }
         });
 
@@ -33,54 +33,82 @@ window.addEventListener('load', () => {
     }
 
     // Fetch and parse text data from segments.txt
-    /*
-    fetch('segments.txt')
-        .then(response => response.text())
-        .then(text => parseTextData(text))
-        .catch(error => console.error('Error loading text file:', error));
-    */
 
-    const txtData = sessionStorage.getItem('textFileContent');
-    parseTextData(txtData);
-    // Parse and display text data
-    function parseTextData(text) {
-        const lines = text.split('\n');
-        lines.forEach(line => {
-            const match = line.match(/(\d+):\s+([\d.]+)\s*mi\s+([\d:]+\/mile)\s*for\s+([\d.]+)\s*mi/);
-            if (match) {
-                const row = document.createElement('tr');
-                const segmentNumber = match[1];
-                const distanceMi = parseFloat(match[2]);
-                const pace = match[3];
-                const segmentLengthMi = parseFloat(match[4]);
-                const distanceKm = (distanceMi * 1.60934).toFixed(2);
-                const segmentLengthKm = (segmentLengthMi * 1.60934).toFixed(2);
-                const paceParts = pace.split('/');
-                const paceMinutes = paceParts[0];
-                const paceMiles = paceParts[1].replace('mile', '');
-                const paceMinutesTotal = convertPaceToKmPerMinute(paceMinutes, paceMiles);
+    const segmentData = sessionStorage.getItem('segments');
+    const mileData = sessionStorage.getItem('miles');
+    console.log(mileData);
+    console.log(segmentData);
+    parseSegmentData(segmentData);
 
-                const displayDistance = document.getElementById('unit-select').value === 'imperial'
-                    ? `${distanceMi} mi`
-                    : `${distanceKm} km`;
-                const displaySegmentLength = document.getElementById('unit-select').value === 'imperial'
-                    ? `${segmentLengthMi} mi`
-                    : `${segmentLengthKm} km`;
-                const displayPace = document.getElementById('unit-select').value === 'imperial'
-                    ? pace
-                    : `${paceMinutesTotal}/km`;
+    // Parse and display JSON data
+    function parseSegmentData(jsonData) {
+        const data = JSON.parse(jsonData);
 
-                [segmentNumber, displayDistance, displayPace, displaySegmentLength].forEach(value => {
-                    const cell = document.createElement('td');
-                    cell.textContent = value;
-                    row.appendChild(cell);
-                });
+        data.segments.forEach(segment => {
+            const row = document.createElement('tr');
 
-                document.getElementById('data-table').appendChild(row);
-            }
+            const segmentNumber = segment.segment_num;
+            const startDistanceMi = parseFloat(segment.start_distance);
+            const pace = segment.pace;
+            const segmentLengthMi = parseFloat(segment.distance);
+
+            // Convert distances to kilometers
+            const startDistanceKm = (startDistanceMi * 1.60934).toFixed(2);
+            const segmentLengthKm = (segmentLengthMi * 1.60934).toFixed(2);
+
+            // Convert pace to km/min if needed
+            const paceMinutesTotal = convertPaceToKmPerMinute(pace, 'mile');
+
+            // Determine display values based on selected units
+            const displayStartDistance = document.getElementById('unit-select').value === 'imperial'
+                ? `${startDistanceMi} mi`
+                : `${startDistanceKm} km`;
+            const displaySegmentLength = document.getElementById('unit-select').value === 'imperial'
+                ? `${segmentLengthMi} mi`
+                : `${segmentLengthKm} km`;
+            const displayPace = document.getElementById('unit-select').value === 'imperial'
+                ? `${pace}/mile`
+                : `${paceMinutesTotal}/km`;
+
+            // Append cells to the row
+            [segmentNumber, displayStartDistance, displayPace, displaySegmentLength].forEach(value => {
+                const cell = document.createElement('td');
+                cell.textContent = value;
+                row.appendChild(cell);
+            });
+
+            document.getElementById('data-table').appendChild(row);
         });
     }
 
+    function parseMileIndexData(data) {
+        data.segments.forEach(segment => {
+            const row = document.createElement('tr');
+            
+            const mileIndex = segment.mile_index;
+            const elapsedTime = formatTime(segment.elapsed_time);
+            const pacePerMile = segment.pace_per_mile;
+            const timePerMile = formatTime(segment.time_per_mile);
+    
+            // Append row to table
+            [mileIndex, `${elapsedTime}`, `${pacePerMile}/mile`, `${timePerMile}`].forEach(value => {
+                const cell = document.createElement('td');
+                cell.textContent = value;
+                row.appendChild(cell);
+            });
+            
+            document.getElementById('data-table').appendChild(row);
+        });
+    }
+    // Helper function to format time in minutes to "HH:MM:SS"
+    function formatTime(minutes) {
+        const totalSeconds = Math.floor(minutes * 60);
+        const hours = Math.floor(totalSeconds / 3600);
+        const minutesPart = Math.floor((totalSeconds % 3600) / 60);
+        const seconds = totalSeconds % 60;
+    
+        return `${String(hours).padStart(2, '0')}:${String(minutesPart).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+    }    
     // Convert pace from minutes/mile to minutes/km
     function convertPaceToKmPerMinute(paceMinutes, paceMiles) {
         const [mins, secs] = paceMinutes.split(':').map(Number);
@@ -90,12 +118,20 @@ window.addEventListener('load', () => {
     }
 
     document.getElementById('unit-select').addEventListener('change', () => {
-        document.getElementById('data-table').innerHTML = "<tr>\
-            <th>Segment</th>\
-            <th>Distance (mi)</th>\
-            <th>Pace (/mile)</th>\
-            <th>Segment Length (mi)</th>\
-        </tr>";
+        const segmentType = document.getElementById('segment-select').value;
+        const headers = segmentType === 'segments'
+            ? ["Segment", "Start Distance", "Pace", "Segment Length"]
+            : ["Mile", "Elapsed Time", "Avg Pace", "Time/Mile"];
+    
+        // Update table headers
+        document.getElementById('data-table').innerHTML = `
+            <tr>
+                <th>${headers[0]}</th>
+                <th>${headers[1]}</th>
+                <th>${headers[2]}</th>
+                <th>${headers[3]}</th>
+            </tr>
+        `;
         const geojsonEdited = JSON.parse(geoData);
         if (document.getElementById('unit-select').value === 'metric') {
             geojsonEdited.features.forEach(feature => {
@@ -130,12 +166,38 @@ window.addEventListener('load', () => {
             }).addTo(map);
             map.fitBounds(geoJsonLayer.getBounds());
         }
-        parseTextData(txtData);
-        /*
-        fetch('segments.txt')
-            .then(response => response.text())
-            .then(text => parseTextData(text))
-            .catch(error => console.error('Error loading text file:', error));
-        */
+        if (document.getElementById('segment-select').value === 'segments') {
+            parseSegmentData(segmentData);
+        } else {
+            const data = JSON.parse(mileData);
+            parseMileIndexData(data);
+        }
     });
+    document.getElementById('segment-select').addEventListener('change', () => {
+        // Set table headers based on the selected segment type
+        const segmentType = document.getElementById('segment-select').value;
+        const headers = segmentType === 'segments'
+            ? ["Segment", "Start Distance", "Pace", "Segment Length"]
+            : ["Mile", "Elapsed Time", "Avg Pace", "Time/Mile"];
+        const tableLabel = document.getElementById('table-label');
+        tableLabel.textContent = segmentType === 'segments' ? "Segment Data" : "Mile Data";
+        // Update table headers
+        document.getElementById('data-table').innerHTML = `
+            <tr>
+                <th>${headers[0]}</th>
+                <th>${headers[1]}</th>
+                <th>${headers[2]}</th>
+                <th>${headers[3]}</th>
+            </tr>
+        `;
+    
+        // Parse and display data based on selected type
+    
+        if (segmentType === 'segments') {
+            parseSegmentData(segmentData);
+        } else {
+            const data = JSON.parse(mileData);
+            parseMileIndexData(data);
+        }
+    });    
 });

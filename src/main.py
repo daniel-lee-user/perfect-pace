@@ -137,16 +137,17 @@ def main():
         file_path = {
             'geojson': os.path.join(pacing_plan_directory + '/' + plan_identifier + '.json'),
             'plot': os.path.join(pacing_plan_directory + '/' + plan_identifier + '.jpg'),
-            'plan_segments': os.path.join(pacing_plan_directory + '/' + plan_identifier + '_segments.txt'),
-            'plan_miles': os.path.join(pacing_plan_directory +  '/' +plan_identifier + "_miles.csv")
+            'plan_segments': os.path.join(pacing_plan_directory + '/' + plan_identifier + '_segments.json'),
+            'plan_miles': os.path.join(pacing_plan_directory +  '/' +plan_identifier + "_miles.json")
         }
 
         plan.gen_geojson(file_path['geojson'], use_loop)
         plan.gen_pace_chart(file_path['plot'], incl_opt_paces=True, incl_true_paces=True)
-        plan.gen_plan_per_mile(file_path["plan_miles"], use_csv=False)
-        
-        with open(file_path['plan_segments'], 'w') as f:
-            f.write(plan.gen_abbrev_plan())
+        #plan.gen_plan_per_mile(file_path["plan_miles"], use_csv=False)
+        plan.gen_plan_per_mile_json(file_path["plan_miles"])
+        plan.gen_abbrev_plan_json(file_path['plan_segments'])
+        #with open(file_path['plan_segments'], 'w') as f:
+        #    f.write(plan.gen_abbrev_plan())
 
         if repeat:
             repeat = bool(int(input('\nCreate another pace plan? 0/1\t')))

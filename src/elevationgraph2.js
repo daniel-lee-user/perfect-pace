@@ -520,7 +520,7 @@ L.Control.Elevation = L.Control.extend({
 
             this._mouseHeightFocusLabel.attr("x", layerpoint.x)
                 .attr("y", normalizedY)
-                .text(item.pace.toFixed(4) + " min/mi")
+                .text(item.pace.toFixed(2) + " min/mi")
                 .style("visibility", "visible");
 
         } else {
@@ -779,7 +779,7 @@ L.Control.Elevation = L.Control.extend({
         var g = d3.select(this._container).select("svg").select("g");
         this._segmentIndex.forEach((element, index) => {
             var xCoordinate = this._data[element].xDiagCoord;
-            var paceValue = this._data[element].pace.toFixed(4);
+            var paceValue = this._data[element].pace.toFixed(2);
 
             // Group for each pace marker
             var paceGroup = g.append("g");
@@ -838,7 +838,7 @@ L.Control.Elevation = L.Control.extend({
             .text(numX + " km");
         this._paceLabel.attr("y", this._height() - 65)
             .attr("x", xCoordinate)
-            .text(item.pace.toFixed(4) + " min/mi");
+            .text(item.pace.toFixed(2) + " min/mi");
     },
 
     _applyData: function () {

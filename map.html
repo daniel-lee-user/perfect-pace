@@ -8,17 +8,20 @@
     <link rel="stylesheet" href="node_modules/leaflet/dist/leaflet.css" />
     <link rel="stylesheet" href="node_modules/leaflet.elevation/dist/Leaflet.Elevation-0.0.2.css" />
     <link rel="stylesheet" href="src/styles2.css" />
+    <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
     <script src="node_modules/leaflet/dist/leaflet.js"></script>
     <script src="http://d3js.org/d3.v3.min.js" charset="utf-8"></script>
     <script src="//api.tiles.mapbox.com/mapbox.js/plugins/leaflet-omnivore/v0.3.1/leaflet-omnivore.min.js"></script>
     <script src="src/elevationgraph2.js"></script>
     <script src="src/mapscript.js" defer></script>
+    <script src="src/reloadscript.js" defer></script>
 </head>
 
 <body>
     <div class="container">
         <div id="table-container">
-            <h3>Segment Data
+            <h3>
+                <span id="table-label">Segment Data</span>
                 <select id="segment-select" class="segment-select">
                     <option value="segments">Segments</option>
                     <option value="miles">Miles</option>
@@ -37,6 +40,44 @@
                 </tr>
             </table>
         </div>
+
+        <!-- Placeholder box over the map -->
+        <div id="paces-change">
+            <h3>Pace Changes</h3>
+            <form>
+                <div class="form-group">
+                    <label for="paceChanges">Pace changes:
+                    <input type="number" id="paceChanges" name="paceChanges" min="1">
+                </label>
+                </div>
+                <div class="form-group">
+                    <label for="time">Minutes:
+                    <input type="number" id="time" name="time" min="1">
+                </label>
+                </div>
+                <div class="form-group">
+                    <label for="loops">Is this course a loop?
+                    <input type="checkbox" id="loops" name="loops" value="loops">
+                    </label>
+                </div>
+                <div class="form-group">
+                    <label for="plan-type">Plan Type:
+                    <select id="plan-type" name="plan-type">
+                        <option value="DP">DP</option>
+                        <option value="LP">LP</option>
+                    </select>
+                    </label>
+                </div>
+            <div class="form-group">
+                <button type="submit" class="submit-button" id="submitBtn">Submit</button>
+            </div>
+            </form>
+        </div>
+        
+        <div id="loadingScreen">
+            <h1>Loading...</h1>
+        </div>
+
         <div id="map"></div>
     </div>
 </body>

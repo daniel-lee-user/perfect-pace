@@ -1,11 +1,12 @@
 import argparse
 import os
 import race_course
-from pacing_plan import PacingPlanBruteForce, PacingPlanAvgPacePerMile, PacingPlanAvgPace
+from pacing_plan import PacingPlanBFAbsolute, PacingPlanBFSquare, PacingPlanAvgPacePerMile, PacingPlanAvgPace
 from pacing_plan_lp import PacingPlanLPAbsolute, PacingPlanLPSquare
 
 PACING_PLAN_METHODS = {
-    "BF": PacingPlanBruteForce,
+    "BFA": PacingPlanBFAbsolute,
+    "BFS": PacingPlanBFSquare,
     "LPA": PacingPlanLPAbsolute,
     "LPS": PacingPlanLPSquare,
     "APPM": PacingPlanAvgPacePerMile,

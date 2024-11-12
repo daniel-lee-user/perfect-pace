@@ -6,7 +6,7 @@ import math
 from gpx_parser import Segment
 from scipy import ndimage
 from utils import Conversions, Unit, SegmentType
-import segments
+import segment_view
 
 import os
 
@@ -149,15 +149,18 @@ class RealRaceCourse(RaceCourse):
         lons = lons[valid_indices_appended]
         elevations = raw_elevations[valid_indices_appended]
 
-        metric_view = segments.SegmentViewMetric(SegmentType.VARIABLE, lats, lons, segment_lengths, elevations)
-        interpolated_unif = segments.SegmentViewInterpUniform(metric_view, N_SEGMENTS)
-        smoothed_gaussian = segments.SegmentViewSmoothedGaussian(interpolated_unif, sigma =1)
-        final_imperial = segments.SegmentViewImperial(smoothed_gaussian)
+        metric_view = segment_view.SegmentViewMetric(SegmentType.VARIABLE, lats, lons, segment_lengths, elevations)
+        interpolated_unif = segment_view.SegmentViewInterpUniform(metric_view, N_SEGMENTS)
+        smoothed_gaussian = segment_view.SegmentViewSmoothedGaussian(interpolated_unif, sigma =1)
+        final_imperial = segment_view.SegmentViewImperial(smoothed_gaussian)
         self.change_view(final_imperial)
     
-    def change_view(self, view: segments.SegmentView):
+    def change_view(self, view: segment_view.SegmentView):
         self.n_segments = view.n_segments
-        self.units = view.units
+        if isinstance(view, segment_view.SegmentViewMetric):
+            self.units = Unit.METRIC
+        else:
+            self.units = Unit.IMPERIAL
         self.lats = view.lats
         self.lons = view.lons
         self.distances = view.segment_lengths 

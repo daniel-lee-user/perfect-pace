@@ -60,18 +60,25 @@ document.getElementById('fileInput').addEventListener('change', async function (
         const blob = await response.blob();
         const zip = await JSZip.loadAsync(blob);
 
-        const jsonFile = await zip.file(/.*\.json/)[0].async("text");
-        const txtFile = await zip.file(/.*\.txt/)[0].async("text");
+        // Extract the JSON file
+        const jsonFile = await zip.file(/.*\.json$/)[0]?.async("text");
+
+        // Extract the miles CSV file
+        const mileCsvFile = await zip.file(/.*_miles\.csv$/)[0]?.async("text");
+
+        // Extract the regular segments TXT file
+        const regularTxtFile = await zip.file(/.*_segments\.txt$/)[0]?.async("text");
+
         const jsonData = JSON.parse(jsonFile);
 
         // right now I save the geojson data and text file content to local storage, might 
         // need to change it if this related data becomes > 5MB
         modifyGeoJSON(jsonData);
         // save in localstorage to pass to map
-        sessionStorage.setItem('textFileContent', txtFile);
-
-        //console.log("Pacing plan generated:", jsonData);
-        //console.log("TEXT DATA:", txtFile);
+        sessionStorage.setItem('textFileContent', regularTxtFile);
+        sessionStorage.setItem('mileTextContent', mileCsvFile);
+        console.log(mileCsvFile);
+        console.log(regularTxtFile)
     } catch (error) {
         console.error('Error:', error);
         // only feed in regular gpx file if algorithm fails for some reason
@@ -138,6 +145,7 @@ document.getElementById('fileInput').addEventListener('change', async function (
 
         // Store the modified GeoJSON in local storage
         sessionStorage.setItem('geoData', JSON.stringify(geojson));
+        console.log(JSON.stringify(geojson))
 
         console.log("GeoJSON modified with segmented features and stored.");
     }

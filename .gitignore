@@ -2,8 +2,8 @@ __pycache__
 data
 node_modules
 test
-.DS_Store
 .ppace
 notebooks/.ipynb_checkpoints
+.DS_Store/node_modules
 .ipynb_checkpoints
 results/

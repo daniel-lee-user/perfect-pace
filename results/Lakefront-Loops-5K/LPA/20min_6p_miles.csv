@@ -1,0 +1,9 @@
+Lakefront-Loops-5K: 20 minute plan
+
+[mile_idx], [pace], [time_per_mile], [elapsed_time], [distance (miles)]
+0 mi 	-1:00/mile 	 -1.0 min 	 -1.0 min 	 1.0 mi
+1 mi 	-1:00/mile 	 -1.0 min 	 -2.0 min 	 1.0 mi
+2 mi 	-1:00/mile 	 -1.0 min 	 -3.0 min 	 1.0 mi
+3 mi 	-1:00/mile 	 -0.09143784242352426 min 	 -3.0914378424235243 min 	 0.09143784242352426 mi
+
+Total time: 20.00

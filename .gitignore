@@ -3,3 +3,7 @@ data
 node_modules
 test
 .DS_Store
+.ppace
+notebooks/.ipynb_checkpoints
+.ipynb_checkpoints
+results/

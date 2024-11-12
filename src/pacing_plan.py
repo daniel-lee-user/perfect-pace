@@ -291,6 +291,7 @@ class PacingPlanBruteForce(PacingPlan):
         self.MIN_SEGMENT_LENGTH = 5 # TODO: test different values of this parameter; dynamically change its initialization based off the race course
         self.WP = np.zeros((n,n+1))
         self.LOSS = np.ones((n, n+1, total_paces)) * np.inf
+        self.loss_method = np.square # TODO: change to be included in flags
         self.OPT = np.ones((n, n+1, total_paces)).astype(int)*-1
         self.cached_m_paces = 0
 
@@ -341,7 +342,8 @@ class PacingPlanBruteForce(PacingPlan):
             for i in range(n):
                 for j in range(i+1, n+1):
                     self.WP[i,j] = np.dot(self.optimal_paces[i:j], self.get_distances()[i:j] / sum(self.get_distances()[i:j]))
-                    self.LOSS[i,j,0] = np.sum(self.optimal_paces[i:j] - self.WP[i,j])
+                    loss = np.sum(self.loss_method(self.optimal_paces[i:j]-self.WP[i,j]))
+                    self.LOSS[i,j,0] = loss
 
         for a in range(max(1, self.cached_m_paces), self.current_m_paces):
             if verbose:

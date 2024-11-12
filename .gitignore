@@ -2,4 +2,7 @@ __pycache__
 data
 node_modules
 test
-.DS_Store
+.DS_Store/node_modules
+.ppace
+.ipynb_checkpoints
+results/

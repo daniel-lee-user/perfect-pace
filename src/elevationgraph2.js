@@ -6,7 +6,7 @@ L.Control.Elevation = L.Control.extend({
         height: 175,
         margins: {
             top: 10,
-            right: 20,
+            right: 40,
             bottom: 30,
             left: 60
         },
@@ -32,6 +32,7 @@ L.Control.Elevation = L.Control.extend({
     onAdd: function (map) {
         this._map = map;
         var segmentIndex = this._segmentIndex = [];
+        var allPaces = this._allPaces = [];
 
         var opts = this.options;
         var margin = opts.margins;
@@ -47,6 +48,11 @@ L.Control.Elevation = L.Control.extend({
 
         var y = this._y = d3.scale.linear()
             .range([this._height(), 0]);
+        
+        var y2 = this._y2 = d3.scale.linear()
+            .range([this._height(), 0]);
+
+        var paceOverlay = this._paceOverlay = false;
 
         var area = this._area = d3.svg.area()
             .interpolate(opts.interpolation)
@@ -112,6 +118,7 @@ L.Control.Elevation = L.Control.extend({
 
         this._xaxisgraphicnode = g.append("g");
         this._yaxisgraphicnode = g.append("g");
+        this._yaxisgraphicnode2 = g.append("g");
         this._appendXaxis(this._xaxisgraphicnode);
         this._appendYaxis(this._yaxisgraphicnode);
 
@@ -132,15 +139,15 @@ L.Control.Elevation = L.Control.extend({
         // Add label for checkbox
         const label = L.DomUtil.create('label', '', checkboxContainer);
         label.htmlFor = 'paceCheckbox';
-        label.innerText = 'Show Pace Markers';
+        label.innerText = 'Show Pace Overlay';
 
         L.DomEvent.disableClickPropagation(container);
 
         checkbox.addEventListener('change', () => {
             if (checkbox.checked) {
-                this._showPaceMarkers(); // Replace with your function to show markers
+                this._showPaceMarkers();
             } else {
-                this._hidePaceMarkers(); // Replace with your function to hide markers
+                this._hidePaceMarkers();
             }
         });
 
@@ -402,6 +409,19 @@ L.Control.Elevation = L.Control.extend({
             .style("text-anchor", "end")
             .text("m");
     },
+    _appendYaxis2: function (y) {
+        y.attr("class", "y axis")
+            .attr("transform", "translate(" + this._width() + " ,0)")   
+            .call(d3.svg.axis()
+                .scale(this._y2)
+                .ticks(this.options.yTicks)
+                .orient("right"))
+            .append("text")
+            .attr("x", 40)
+            .attr("y", -1)
+            .style("text-anchor", "end")
+            .text("mi/min");
+    },
 
     _appendXaxis: function (x) {
         x.attr("class", "x axis")
@@ -426,6 +446,10 @@ L.Control.Elevation = L.Control.extend({
         this._yaxisgraphicnode.selectAll("text").remove();
         this._appendXaxis(this._xaxisgraphicnode);
         this._appendYaxis(this._yaxisgraphicnode);
+        this._yaxisgraphicnode2.selectAll("g").remove();
+        this._yaxisgraphicnode2.selectAll("path").remove();
+        this._yaxisgraphicnode2.selectAll("text").remove();
+        this._appendYaxis2(this._yaxisgraphicnode2);
     },
 
     _mouseoutHandler: function () {
@@ -656,6 +680,8 @@ L.Control.Elevation = L.Control.extend({
                     var data = this._data || [];
                     const start = data.length;
                     this._segmentIndex.push(start);
+                    //console.log(d.properties.pace);
+                    this._allPaces.push(d.properties.pace);
                     this._addGeoJSONDataPace(geom.coordinates, d.properties.pace);
                     break;
 
@@ -664,6 +690,7 @@ L.Control.Elevation = L.Control.extend({
                         var data = this._data || [];
                         const start = data.length;
                         this._segmentIndex.push(start);
+                        this._allPaces.push(d.properties.pace);
                         this._addGeoJSONDataPace(geom.coordinates[i], d.properties.pace);
                     }
                     break;
@@ -776,35 +803,57 @@ L.Control.Elevation = L.Control.extend({
     },
 
     _showPaceMarkers: function () {
+        if(this._paceOverlay) {
+            d3.select(this._container).select("svg").selectAll(".pace-line")
+                .attr('visibility', 'visible');
+            return;
+        }
         var g = d3.select(this._container).select("svg").select("g");
-        this._segmentIndex.forEach((element, index) => {
-            var xCoordinate = this._data[element].xDiagCoord;
-            var paceValue = this._data[element].pace.toFixed(2);
 
-            // Group for each pace marker
+        //console.log(this._allPaces);
+        this._segmentIndex.forEach((element, index) => {
             var paceGroup = g.append("g");
+            if(index == this._segmentIndex.length-1) {
+                // if its the last index just do the last line to the end
+                var xCoordinate = this._data[element].xDiagCoord;
+                var paceValue = this._data[element].pace.toFixed(2);
+                var yValue = this._y2(paceValue);
+                paceGroup.append('svg:line')
+                    .attr('class', 'pace-line')
+                    .attr('x1', xCoordinate)
+                    .attr('y1', yValue)
+                    .attr('x2', this._width())
+                    .attr('y2', yValue)
+                    .attr('stroke', 'red')
+                    .attr('visibility', 'visible');
+                return;
+            }
+            var xCoordinate = this._data[element].xDiagCoord;
+            var xCoordinate2 = this._data[this._segmentIndex[index+1]].xDiagCoord;
+            var paceValue = this._data[element].pace.toFixed(2);
+            var paceValue2 = this._data[this._segmentIndex[index+1]].pace.toFixed(2);
+            var yValue = this._y2(paceValue);
+            var yValue2 = this._y2(paceValue2);
+            // Group for each pace marker
 
             // Adding the pace line in red color
             paceGroup.append('svg:line')
                 .attr('class', 'pace-line')
                 .attr('x1', xCoordinate)
-                .attr('y1', '0')
-                .attr('x2', xCoordinate)
-                .attr('y2', this._height())
+                .attr('y1', yValue)
+                .attr('x2', xCoordinate2)
+                .attr('y2', yValue)
                 .attr('stroke', 'red')
                 .attr('visibility', 'visible');
-
-            // Adjusting the y position to stagger labels and prevent overlap
-            var labelYPosition = this._height() - 65 - (index % 5) * 15; // Adjust 15px per line
-
-            // Adding the pace label
-            paceGroup.append("svg:text")
-                .attr("class", "pace-label-line")
-                .attr("x", xCoordinate)
-                .attr("y", labelYPosition)  // Staggered y-position
-                .text(paceValue + " min/mi")
-                .style("pointer-events", "none")
+            paceGroup.append('svg:line')
+                .attr('class', 'pace-line')
+                .attr('x1', xCoordinate2)
+                .attr('y1', yValue)
+                .attr('x2', xCoordinate2)
+                .attr('y2', yValue2)
+                .attr('stroke', 'red')
                 .attr('visibility', 'visible');
+            this._paceOverlay = true;
         });
     },
 
@@ -812,8 +861,8 @@ L.Control.Elevation = L.Control.extend({
         // Hide both lines and labels
         d3.select(this._container).select("svg").selectAll(".pace-line")
             .attr('visibility', 'hidden');
-        d3.select(this._container).select("svg").selectAll(".pace-label-line")
-            .attr('visibility', 'hidden');
+        //d3.select(this._container).select("svg").selectAll(".pace-label-line")
+        //    .attr('visibility', 'hidden');
     },
 
     _showDiagramIndicator: function (item, xCoordinate) {
@@ -848,6 +897,7 @@ L.Control.Elevation = L.Control.extend({
         var ydomain = d3.extent(this._data, function (d) {
             return d.altitude;
         });
+        var pacedomain = d3.extent(this._allPaces);
         var opts = this.options;
 
         if (opts.yAxisMin !== undefined && (opts.yAxisMin < ydomain[0] || opts.forceAxisBounds)) {
@@ -858,6 +908,7 @@ L.Control.Elevation = L.Control.extend({
         }
 
         this._x.domain(xdomain);
+        this._y2.domain(pacedomain);
         this._y.domain(ydomain);
         this._areapath.datum(this._data)
             .attr("d", this._area);

@@ -112,7 +112,7 @@ class PacingPlan(ABC):
             pace = self.true_paces_full[i]
             dist = self.race_course.distances[i]
             time = pace * dist
-            elevation = self.race_course.elevations[i] # feet
+            elevation = self.race_course.start_elevations[i] # feet
         
             display_txt += f"{i}, {pace}, {lat}, {lon}, {elevation}, {dist}, {time} \n"
         return display_txt
@@ -226,7 +226,7 @@ class PacingPlan(ABC):
         fig.set_figwidth(20)
 
         x = np.insert(self.race_course.end_distances, 0,0)
-        y_elevations = np.append(self.race_course.elevations, self.race_course.end_elevations[-1])
+        y_elevations = np.append(self.race_course.start_elevations, self.race_course.end_elevations[-1])
         ax.plot(x, y_elevations, label ='elevation', color='blue')
 
         ax.set_xlabel('distance (miles)')
@@ -263,9 +263,10 @@ class PacingPlanBruteForce(PacingPlan):
     def __init__(self,race_course : race_course.RaceCourse, target_time, total_paces):
         super().__init__(race_course, target_time, total_paces)
         n = self.get_n_segments()
-        self.MIN_SEGMENT_LENGTH = 5 # TODO: test different values of this parameter; dynamically change its initialization based off the race course
+        self.MIN_SEGMENT_LENGTH = 3 # TODO: test different values of this parameter; dynamically change its initialization based off the race course
         self.WP = np.zeros((n,n+1))
         self.LOSS = np.ones((n, n+1, total_paces)) * np.inf
+        self.loss_method = np.square # TODO: change to be included in flags
         self.OPT = np.ones((n, n+1, total_paces)).astype(int)*-1
         self.cached_m_paces = 0
 
@@ -316,7 +317,8 @@ class PacingPlanBruteForce(PacingPlan):
             for i in range(n):
                 for j in range(i+1, n+1):
                     self.WP[i,j] = np.dot(self.optimal_paces[i:j], self.get_distances()[i:j] / sum(self.get_distances()[i:j]))
-                    self.LOSS[i,j,0] = np.sum(self.optimal_paces[i:j] - self.WP[i,j])
+                    loss = np.sum(self.loss_method(self.optimal_paces[i:j]-self.WP[i,j]))
+                    self.LOSS[i,j,0] = loss
 
         for a in range(max(1, self.cached_m_paces), self.current_m_paces):
             if verbose:

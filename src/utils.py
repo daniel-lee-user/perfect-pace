@@ -5,6 +5,14 @@ class Unit(Enum):
     METRIC = 1
     IMPERIAL = 2
 
+class SmoothingMethod(Enum):
+    BOX = 1
+    GAUSSIAN = 2
+
+class SegmentType(Enum):
+    UNIFORM = 1
+    VARIABLE = 2
+
 class Conversions(Enum):
     METERS_TO_MILES = 0.0006213712
     METERS_TO_FEET = 3.28084

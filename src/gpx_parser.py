@@ -29,11 +29,16 @@ class Segment:
     def calculate_slope_angle(self):
         if self.distance > 0:
             elevation_change = self.elevation_change
-            horizontal_distance = math.sqrt(self.distance**2 - elevation_change**2) if elevation_change else self.distance
+            try:
+                horizontal_distance = math.sqrt(self.distance**2 - elevation_change**2) if elevation_change else self.distance
+            except:
+                horizontal_distance = 0
             return math.atan2(elevation_change, horizontal_distance) * (180 / math.pi)
         return None
     
     def calculate_grade(self):
+        if self.distance == 0:
+            return 0
         return self.elevation_change / self.distance * 100
 
     def __repr__(self):

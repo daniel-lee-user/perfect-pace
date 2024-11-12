@@ -77,7 +77,7 @@ class PacingPlan(ABC):
             else:
                 self.pace_per_mile[m] = time / (overflow_distance + np.sum(self.race_course.distances[i:j]))
             total_time += time
-        # assert (np.isclose(total_time, self.true_total_time))
+        return self.pace_per_mile
 
     @abstractmethod
     def _calculate_recommendations(self, verbose) -> np.ndarray:
@@ -102,6 +102,8 @@ class PacingPlan(ABC):
         self.true_paces_abbrev = utils.gen_abbrev_paces(paces)
         self.critical_segments = utils.gen_critical_segments(paces)
         self.elapsed_dists = utils.gen_elapsed_distances(paces, self.race_course.start_distances, self.race_course.total_distance)
+        self.pace_per_mile = self.gen_pace_per_mile(self.true_paces_full)
+        self.true_total_time = np.sum(self.true_seg_times)
 
         return paces
     
@@ -130,37 +132,20 @@ class PacingPlan(ABC):
         
         # Loop through each segment and create a new feature for each one
         all_changes = self.critical_segments
-        if(all_changes[len(all_changes)-1] != self.get_n_segments()-1):
-            all_changes = np.append(all_changes, self.get_n_segments()-1)
-        start_idx = all_changes[0] # assuming changes always starts at 0
-        for i in range(1, len(all_changes)):
-            all_segments = []
-            for j in range(start_idx, all_changes[i]+1):
-                all_segments.append(self.race_course.segments[j])
-            
-            pace = self.true_paces_full[start_idx]
-            
-            coords = [[seg.start_lon, seg.start_lat, seg.start_ele] for seg in all_segments]
-            if(i == len(all_changes)-1 and loop):
-                # if last segment and loop is true
-                first_seg = self.race_course.segments[0]
-                coords.append([first_seg.start_lon, first_seg.start_lat, first_seg.start_ele])
-
+        if (all_changes[-1] != self.get_n_segments()):
+            all_changes = np.append(all_changes, self.get_n_segments())
+        
         for start, end in zip(all_changes, all_changes[1:]):
             pace = self.true_paces_full[start]
             lats = self.race_course.lats[start:end+1]
             lons = self.race_course.lons[start:end+1]
             elevations = self.race_course.elevations[start:end+1]
 
-            coords = np.stack((lons,lats,elevations))
+            coords = np.stack((lons,lats, elevations))
             coords = coords.T.tolist()
 
-            if(end == self.get_n_segments()-1):
-                # TODO: uncomment this: it adds the end elevation of the last segment
-                # coords.append([self.race_course.lons[-1],self.race_course.lats[-1],self.race_course.elevations[-1]])
-                if loop:
-                    # add start elevation of the entire loop ... double-check: could this be redundant with the value at -1? 
-                    coords.append([self.race_course.lons[0],self.race_course.lats[0],self.race_course.elevations[0]])
+            if(end == self.get_n_segments() and loop):
+                coords.append([self.race_course.lons[0],self.race_course.lats[0],self.race_course.elevations[0]])
             
             # Create a feature for each segment
             feature = {
@@ -313,7 +298,7 @@ class PacingPlan(ABC):
         fig.set_figwidth(20)
 
         x = np.insert(self.race_course.end_distances, 0,0)
-        y_elevations = np.append(self.race_course.elevations, self.race_course.end_elevations[-1])
+        y_elevations = self.race_course.elevations
         alpha = 1 if incl_elevation else 0
         ax.plot(x, y_elevations, label ='elevation', color='blue', alpha=alpha)
 
@@ -399,7 +384,8 @@ class PacingPlanBF(PacingPlan):
 
         # list of segment indices where we change the paces
         self.critical_segments = np.array(sorted(self.get_idxs(0,n, self.current_m_paces-1))).astype(int)
-
+        
+        # TODO: turn into numpy function
         for j in range(m_paces):
             low = self.critical_segments[j]
             high = n if (j == m_paces - 1) else self.critical_segments[j+1]
@@ -414,8 +400,6 @@ class PacingPlanBF(PacingPlan):
             self.elapsed_dists[j] = elapsed_dist
             self.true_seg_times[j] = pace * elapsed_dist
         
-        self.true_total_time = np.sum(self.true_seg_times)
-
     def calculate_brute_force(self, verbose=True):
         n = self.get_n_segments()
         

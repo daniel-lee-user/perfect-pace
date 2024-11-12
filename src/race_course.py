@@ -3,7 +3,6 @@ import gpx_parser
 import numpy as np
 import matplotlib.pyplot as plt
 import math
-from gpx_parser import Segment
 from scipy import ndimage
 from utils import cprint, Conversions, Unit
 
@@ -15,7 +14,6 @@ from utils import cprint, Conversions, Unit
 class RaceCourse:
     def __init__(self, name):
         self.course_name = name
-        self.segments: list[Segment] = None  # list of Segment objects
 
     @staticmethod
     def calculate_grade(elevation_change, distance):
@@ -89,9 +87,8 @@ class RaceCourse:
         fig.set_figwidth(20)
         
         distances = np.insert(self.end_distances, 0,0)
-        full_elevations = np.append(self.elevations, self.end_elevations[-1])
         
-        ax.plot(distances, full_elevations, label ='elevation', color='blue')
+        ax.plot(distances, self.elevations, label ='elevation', color='blue')
         ax.set_xlabel('distance (miles)')
         ax.set_ylabel('elevation (feet)')
         
@@ -123,9 +120,6 @@ class RealRaceCourse(RaceCourse):
 
     def __init__(self, name, file_path):
         super().__init__(name)
-
-        self.segments = gpx_parser.parse_gpx(file_path) # remove after all references to segments are removed
-
         self.units = Unit.METRIC
         self.file_path = file_path
         lats, lons, elevations = self.parse_gpx()
@@ -151,10 +145,11 @@ class RealRaceCourse(RaceCourse):
         self.total_distance = self.end_distances[-1]
 
         valid_elevations = elevations[np.append(valid_indices, True)]
-        self.elevations = valid_elevations[:-1]
-        self.elevations_metric = self.elevations
+        self.elevations = valid_elevations
+        self.start_elevations = valid_elevations[:-1]
+        self.elevations_metric = self.start_elevations
         self.end_elevations = valid_elevations[1:]
-        self.elevation_changes = self.end_elevations - self.elevations
+        self.elevation_changes = self.end_elevations - self.start_elevations
 
         calculate_grade = np.vectorize(RealRaceCourse.calculate_grade_scalar)
         self.grades = calculate_grade(self.elevation_changes, self.distances)
@@ -204,7 +199,7 @@ class RealRaceCourse(RaceCourse):
         self.start_distances =   self.start_distances * Conversions.METERS_TO_MILES.value
         self.total_distance = self.total_distance * Conversions.METERS_TO_MILES.value
 
-        self.elevations = self.elevations * Conversions.METERS_TO_FEET.value
+        self.start_elevations = self.start_elevations * Conversions.METERS_TO_FEET.value
         self.end_elevations = self.end_elevations * Conversions.METERS_TO_FEET.value
         self.elevation_changes = self.elevation_changes * Conversions.METERS_TO_FEET.value
         

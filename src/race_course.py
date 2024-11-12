@@ -4,6 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import math
 from gpx_parser import Segment
+from scipy import ndimage
 from utils import cprint, Conversions, Unit
 
 # TODO: Remove hard-coded conversions to feet and miles
@@ -23,7 +24,12 @@ class RaceCourse:
     # TODO find some better arg values for smoothening function...
     def smoothen_segments(self, smoothen: str = "running_avg", *args):
         '''
-        Smoothens the segments in this racecourse. 
+        Smoothens the segments in this racecourse. NOTE: Only {running_avg} modifies segment data!
+        Others directly modify self.grades and self.elevation_changes
+
+        running_avg:    Box filter
+        loess:          LOESS regression
+        gaussian        1 4 6 4 1 filter
 
         :param str type: How to smoothen the course.
         '''
@@ -45,8 +51,7 @@ class RaceCourse:
                 slope_angle += self.segments[i].slope_angle * weight
                 dist += weight
             
-            # TODO implement edges too
-            # iterate window through segments, skipping edges
+            # iterate window through segments, skipping edges of filter
             for i in range(WINDOW_SIZE // 2, len(self.segments) - WINDOW_SIZE // 2):
                 # update condition for the window, skip first instance since already computed
                 if i != WINDOW_SIZE // 2:
@@ -64,49 +69,18 @@ class RaceCourse:
                     slope_angle -= self.segments[i - WINDOW_SIZE // 2].slope_angle * weight
                     dist -= weight
 
-
-                # self.segments[i].elevation_change = 0
-                # self.segments[i].grade = 0
-                # self.segments[i].slope_angle = 0
-
                 self.segments[i].elevation_change = elevation / dist
                 self.segments[i].grade = grade / dist
                 self.segments[i].slope_angle = slope_angle / dist
 
-                # TODO confirm if these are the correct arrays that need to be modified. @HERE
                 self.grades = np.array([self.segments[i].grade for i in range(len(self.segments))])
                 self.elevation_changes = np.array([self.segments[i].elevation_change for i in range(len(self.segments))])
 
-                # TODO clean this up later, this is just a copy of a section of __init__
-                # self.elevation_changes = []
-                # self.elevations = []
-                # self.end_elevations = []
-                # self.grades = []
-                # self.distances = []
-
-                # for i in range(self.n_segments):
-                #     seg = self.segments[i]
-                #     try:
-                #         self.elevation_changes.append(seg.elevation_change * conversion['meters_to_miles']) 
-                #         self.elevations.append(seg.start_ele)
-                #         self.end_elevations.append(seg.end_ele)
-                #         self.grades.append(seg.grade)
-                #         self.distances.append(seg.distance * conversion['meters_to_miles']) 
-                #     except Exception as e:
-                #         print(f'error at segment {i}')   
-                #         print(repr(e))          
-
-                # self.end_distance = np.cumsum(self.distances)
-                # self.start_distance = np.roll(self.end_distance,1)
-                # self.start_distance[0] = 0
-                # self.total_distance = self.end_distance[-1]
-                # self.elevation_changes = np.array(self.elevation_changes)
-                # self.elevations = np.array(self.elevations)
-                # self.end_elevations = np.array(self.end_elevations)
-                # self.grades = np.array(self.grades)
-                # self.distances = np.array(self.distances)
         elif smoothen == "loess":
             raise RuntimeError(f"Unimplemented smoothening argument: {smoothen}")
+        elif smoothen == "gaussian":
+            gaus_sigma = 5    # TODO find a better value?
+            self.grades = np.array(ndimage.gaussian_filter1d(self.grades, gaus_sigma))
         else:
             raise RuntimeError(f"Unrecognized smmothening argument: {smoothen}!")
 
@@ -159,6 +133,7 @@ class RealRaceCourse(RaceCourse):
         self.lats = np.array(lats)
         self.lons = np.array(lons)
         elevations = np.array(elevations)
+        elevations = np.array(ndimage.gaussian_filter1d(elevations, 3))
 
         calculate_distance = np.vectorize(RealRaceCourse.calculate_distance_scalar)
         self.raw_distances = calculate_distance(self.lats[:-1], self.lons[:-1], self.lats[1:], self.lons[1:])

@@ -1,5 +1,4 @@
 import numpy as np
-import cvxpy as cp
 import matplotlib.pyplot as plt
 import race_course
 from abc import ABC, abstractmethod
@@ -30,7 +29,8 @@ class PacingPlan(ABC):
         self.true_seg_times = np.ones(self.current_m_paces).astype(float) * -1
         self.elapsed_dists = np.ones(self.current_m_paces).astype(float) * -1
         self.pace_per_mile = np.ones(int(np.ceil(self.race_course.total_distance))) * -1
-    
+        self.true_total_time = 0
+        
     def get_distances(self):
         return self.race_course.distances
     
@@ -43,7 +43,10 @@ class PacingPlan(ABC):
     def change_total_paces(self, new_m_paces):
         self.total_paces = new_m_paces
 
-    def gen_pace_per_mile(self):
+    def gen_pace_per_mile(self, paces):
+        assert len(paces) == self.get_n_segments(), 'Pacing plan must have a pace for each segment'
+        assert isinstance(paces, np.ndarray), 'Pacing plan must be a numpy array'
+
         n_mile_markers = math.ceil(self.race_course.total_distance)
         mile_markers = np.argwhere(self.race_course.end_distances - np.floor(self.race_course.end_distances) - self.race_course.distances <= 0)
         mile_markers = mile_markers.reshape(n_mile_markers,)
@@ -60,13 +63,13 @@ class PacingPlan(ABC):
             else:
                 j = mile_markers[m+1]
 
-            time = overflow + np.dot(self.race_course.distances[i:j], self.true_paces_full[i:j])
+            time = overflow + np.dot(self.race_course.distances[i:j], paces[i:j])
 
             if m != n_mile_markers - 1:
                 overflow_distance = self.race_course.end_distances[j] - (m+1) # distance from last segment that we exclude
                 incl_distance = self.race_course.distances[j] - overflow_distance
-                incl_time = incl_distance*self.true_paces_full[j]
-                overflow = overflow_distance * self.true_paces_full[j]
+                incl_time = incl_distance*paces[j]
+                overflow = overflow_distance * paces[j]
                 time += incl_time
 
                 self.pace_per_mile[m] = time
@@ -83,7 +86,7 @@ class PacingPlan(ABC):
         """
         pass
 
-    def calculate_recommendations(self, verbose=False, eps=1e-5):
+    def calculate_recommendations(self, verbose=False, eps=1e-2):
         """
         Calculates the pacing plan and populates the necessary attributes
         """
@@ -92,7 +95,8 @@ class PacingPlan(ABC):
         assert len(paces) == self.get_n_segments(), 'Pacing plan must have a pace for each segment'
 
         self.true_seg_times = self.get_distances() * paces
-        assert abs(sum(self.true_seg_times) - self.target_time) < eps, f'Total time of pacing plan must equal target time: {sum(self.true_seg_times).f2} = {self.target_time.f2}'
+        self.true_total_time = sum(self.true_seg_times)
+        assert abs(self.true_total_time - self.target_time) < eps, f'Total time of pacing plan must equal target time: {self.true_total_time:.3f} = {self.target_time:.3f}'
 
         self.true_paces_full = paces
         self.true_paces_abbrev = utils.gen_abbrev_paces(paces)
@@ -142,6 +146,22 @@ class PacingPlan(ABC):
                 first_seg = self.race_course.segments[0]
                 coords.append([first_seg.start_lon, first_seg.start_lat, first_seg.start_ele])
 
+        for start, end in zip(all_changes, all_changes[1:]):
+            pace = self.true_paces_full[start]
+            lats = self.race_course.lats[start:end+1]
+            lons = self.race_course.lons[start:end+1]
+            elevations = self.race_course.elevations[start:end+1]
+
+            coords = np.stack((lons,lats,elevations))
+            coords = coords.T.tolist()
+
+            if(end == self.get_n_segments()-1):
+                # TODO: uncomment this: it adds the end elevation of the last segment
+                # coords.append([self.race_course.lons[-1],self.race_course.lats[-1],self.race_course.elevations[-1]])
+                if loop:
+                    # add start elevation of the entire loop ... double-check: could this be redundant with the value at -1? 
+                    coords.append([self.race_course.lons[0],self.race_course.lats[0],self.race_course.elevations[0]])
+            
             # Create a feature for each segment
             feature = {
                 "type": "Feature",
@@ -156,7 +176,7 @@ class PacingPlan(ABC):
             
             # Append the feature to the features array in GeoJSON
             geojson_data["features"].append(feature)
-            start_idx = all_changes[i]
+
         with open(file_path, 'w') as geojson_file:
             json.dump(geojson_data, geojson_file, indent=4)
         return geojson_data
@@ -285,16 +305,17 @@ class PacingPlan(ABC):
         return result
 
 
-    def gen_pace_chart(self,file_path, incl_opt_paces=False, incl_true_paces=True):
-        if not incl_opt_paces and not incl_true_paces:
-            raise ValueError("at least one of incl_opt_paces or incl_true_paces must be True")
+    def gen_pace_chart(self, file_path, incl_elevation=True, incl_opt_paces=False, incl_true_paces=True, incl_opt_pace_per_mile=False, incl_true_pace_per_mile=False):
+        if not (incl_elevation or incl_opt_paces or incl_true_paces or incl_opt_pace_per_mile or incl_true_pace_per_mile):
+            raise ValueError("at least one of incl_elevation or incl_opt_paces or incl_true_paces or incl_opt_pace_per_mile or incl_true_pace_per_mile must be True")
 
         fig,ax = plt.subplots()
         fig.set_figwidth(20)
 
         x = np.insert(self.race_course.end_distances, 0,0)
         y_elevations = np.append(self.race_course.elevations, self.race_course.end_elevations[-1])
-        ax.plot(x, y_elevations, label ='elevation', color='blue')
+        alpha = 1 if incl_elevation else 0
+        ax.plot(x, y_elevations, label ='elevation', color='blue', alpha=alpha)
 
         ax.set_xlabel('distance (miles)')
         ax.set_ylabel('elevation (feet)')
@@ -302,10 +323,20 @@ class PacingPlan(ABC):
         ax2 = ax.twinx()
         ax2.set_ylabel('pace (min/mile)')
 
-        if incl_opt_paces:
-            y_optimal_paces = np.append(self.optimal_paces, self.optimal_paces[-1])
-            ax2.step(x, y_optimal_paces, label='optimal paces', color='orange', alpha=0.4, where='post')
+        alpha = .4 if incl_opt_paces else 0
+        y_optimal_paces = np.append(self.optimal_paces, self.optimal_paces[-1])
+        ax2.step(x, y_optimal_paces, label='optimal paces', color='orange', alpha=alpha, where='post')
+            
+        if incl_opt_pace_per_mile:
+            self.gen_pace_per_mile(self.optimal_paces)
+            y_optimal_pace_per_mile = np.append(self.pace_per_mile, self.pace_per_mile[-1])
+            x_mile_markers = [i for i in range(0, len(y_optimal_pace_per_mile) - 1)] + [self.race_course.total_distance]
+            ax2.step(x_mile_markers, y_optimal_pace_per_mile, label='optimal pace per mile', color='green', alpha=0.4, where='post')
 
+            for i, xy in enumerate(zip(x_mile_markers[:-1], y_optimal_pace_per_mile[:-1])):
+                pace = y_optimal_pace_per_mile[i]
+                ax2.annotate(f'{utils.get_pace_display_text(pace)}', xy, xytext=(10,10), textcoords='offset pixels')
+            
         if incl_true_paces:
             y_true_paces = np.append(self.true_paces_full, self.true_paces_full[-1])
             ax2.step(x, y_true_paces, label='recommended paces', color='red', where='post')
@@ -314,6 +345,16 @@ class PacingPlan(ABC):
                 if i in self.critical_segments:
                     pace = self.true_paces_full[i]
                     ax2.annotate(f'{utils.get_pace_display_text(pace)}', xy, xytext=(10,10), textcoords='offset pixels')
+        
+        if incl_true_pace_per_mile:
+            self.gen_pace_per_mile(self.true_paces_full)
+            y_optimal_pace_per_mile = np.append(self.pace_per_mile, self.pace_per_mile[-1])
+            x_mile_markers = [i for i in range(0, len(y_optimal_pace_per_mile) - 1)] + [self.race_course.total_distance]
+            ax2.step(x_mile_markers, y_optimal_pace_per_mile, label='optimal pace per mile', color='brown', alpha=0.7, where='post')
+
+            for i, xy in enumerate(zip(x_mile_markers[:-1], y_optimal_pace_per_mile[:-1])):
+                pace = y_optimal_pace_per_mile[i]
+                ax2.annotate(f'{utils.get_pace_display_text(pace)}', xy, xytext=(10,10), textcoords='offset pixels')
 
         fig.legend(loc="upper left", bbox_to_anchor=(0.125, 0.875))
         ax.set_title(f'{self.race_course.course_name} Pacing Plan')
@@ -326,7 +367,7 @@ class PacingPlan(ABC):
         else:
             return self.gen_abbrev_plan()
 
-class PacingPlanBruteForce(PacingPlan):
+class PacingPlanBF(PacingPlan):
     def __init__(self,race_course : race_course.RaceCourse, target_time, total_paces):
         super().__init__(race_course, target_time, total_paces)
         n = self.get_n_segments()
@@ -383,7 +424,8 @@ class PacingPlanBruteForce(PacingPlan):
             for i in range(n):
                 for j in range(i+1, n+1):
                     self.WP[i,j] = np.dot(self.optimal_paces[i:j], self.get_distances()[i:j] / sum(self.get_distances()[i:j]))
-                    self.LOSS[i,j,0] = np.sum(self.optimal_paces[i:j] - self.WP[i,j])
+                    loss = np.sum(self.loss_method(self.optimal_paces[i:j]-self.WP[i,j]))
+                    self.LOSS[i,j,0] = loss
 
         for a in range(max(1, self.cached_m_paces), self.current_m_paces):
             if verbose:
@@ -421,45 +463,35 @@ class PacingPlanBruteForce(PacingPlan):
         if self.current_m_paces > self.cached_m_paces:
             self.calculate_brute_force(verbose)
         self.backtrack_solution()
-        self.gen_pace_per_mile()
+        self.gen_pace_per_mile(self.true_paces_full)
         return self.true_paces_full
 
-class PacingPlanLP(PacingPlan):
+class PacingPlanBFSquare(PacingPlanBF):
+    def __init__(self, race_course : race_course.RaceCourse, target_time, total_paces):
+        super().__init__(race_course, target_time, total_paces)
+        self.loss_method = np.square
+
+class PacingPlanBFAbsolute(PacingPlanBF):
+    def __init__(self, race_course : race_course.RaceCourse, target_time, total_paces):
+        super().__init__(race_course, target_time, total_paces)
+        self.loss_method = np.abs
+
+class PacingPlanAvgPacePerMile(PacingPlan):
     def __init__(self, race_course, target_time, total_paces):
         super().__init__(race_course, target_time, total_paces)
-        
-    def formulate_lp_problem(self, M=1):
-        n_segments = self.get_n_segments()
-        paces = cp.Variable(n_segments)
-        changes = cp.Variable(n_segments-1, integer=True)
-        absolutes = cp.Variable(n_segments)
-        
-        objective = cp.Minimize(cp.sum(absolutes))
-
-        constraints = [
-            paces @ self.get_distances() == self.target_time,
-            paces >= 0,
-            changes >= 0,
-            changes <= 1,
-            cp.sum(changes) == self.current_m_paces - 1,
-            absolutes >= paces - (self.optimal_paces),
-            absolutes >= (self.optimal_paces) - paces
-        ]
-        constraints += [M*changes[i] >= paces[i+1] - paces[i] for i in range(n_segments-1)]
-        constraints += [M*changes[i] >= paces[i] - paces[i+1] for i in range(n_segments-1)]
-        
-        return cp.Problem(objective, constraints)
-
-    def solve_lp_problem(self, verbose):
-        problem = self.formulate_lp_problem()
-        problem.solve(solver=cp.GUROBI)
-        if problem.status == cp.OPTIMAL:
-            if verbose:
-                print(f"Linear Programming Algorithm Run Successfully")
-            self.true_paces_full = problem.variables()[1].value
-        else:
-            raise ValueError("LP problem is infeasible")
 
     def _calculate_recommendations(self, verbose):
-        self.solve_lp_problem(verbose)
+        self.gen_pace_per_mile(self.optimal_paces)
+        for i in range(self.get_n_segments()):
+            mile = int(self.race_course.start_distances[i])
+            self.true_paces_full[i] = self.pace_per_mile[mile]
+        return self.true_paces_full
+
+class PacingPlanAvgPace(PacingPlan):
+    def __init__(self, race_course, target_time, total_paces):
+        super().__init__(race_course, target_time, total_paces)
+
+    def _calculate_recommendations(self, verbose):
+        avg_pace = self.target_time / self.race_course.total_distance
+        self.true_paces_full[:] = avg_pace
         return self.true_paces_full

@@ -1,7 +1,17 @@
 import argparse
 import os
 import race_course
-from pacing_plan import PacingPlanBruteForce, PacingPlanLP
+from pacing_plan import PacingPlanBFAbsolute, PacingPlanBFSquare, PacingPlanAvgPacePerMile, PacingPlanAvgPace
+from pacing_plan_lp import PacingPlanLPAbsolute, PacingPlanLPSquare
+
+PACING_PLAN_METHODS = {
+    "BFA": PacingPlanBFAbsolute,
+    "BFS": PacingPlanBFSquare,
+    "LPA": PacingPlanLPAbsolute,
+    "LPS": PacingPlanLPSquare,
+    "APPM": PacingPlanAvgPacePerMile,
+    "AP": PacingPlanAvgPace
+}
 
 def init_parser() -> argparse.ArgumentParser:
     '''
@@ -13,12 +23,14 @@ def init_parser() -> argparse.ArgumentParser:
     -f, --file  ==> file path
     -t, --time  ==> time in minutes to complete course
     -p, --paces ==> total number of paces
-    -m, --method    ==> pacing plan method to use ("brute_force", "linear_programming")
+    -m, --method    ==> pacing plan method to use
 
     [OPTIONAL]
     -l, --loop      ==> if the course contains a loop
     -s, --smoothen  ==> if the course should be smoothened
-    -r              ==> if a randomly generated course should be used
+    --random        ==> if a randomly generated course should be used
+    -v, --verbose   ==> if the pacing plan should be generated in verbose mode
+    -r, --repeat    ==> if the user wants to repeat generating pacing plans
     -h              ==> opens help menu
     '''
     
@@ -26,8 +38,8 @@ def init_parser() -> argparse.ArgumentParser:
     parser.add_argument("-f", "--file", help="file path of the gpx file to be parsed", required=True)
     parser.add_argument("-t", "--time", type=int, help="time to complete course in minutes", required=True)
     parser.add_argument("-p", "--paces", type=int, help="the total number of paces", required=True)
-    parser.add_argument("-m", "--method", default="brute_force", choices=["brute_force", "linear_programming"],
-                        help="pacing plan method to use. Options are 'brute_force' or 'linear_programming'", required=True)
+    parser.add_argument("-m", "--method", default="BF", choices=PACING_PLAN_METHODS.keys(),
+                        help="pacing plan method to use. Options are: " + ", ".join(PACING_PLAN_METHODS.keys()), required=True)
 
     parser.add_argument("-l", "--loop", action="store_true", help="include this flag if the course contains a loop")
     parser.add_argument("-s", "--smoothen", help="include if the course should be smoothened. running_avg, loess")
@@ -49,11 +61,11 @@ def get_new_inputs():
             print("Invalid input. Please enter a positive integer.")
 
     while True:
-        method = input("\nInput method (BF for Brute Force / LP for Linear Programming): ").strip().upper()
-        if method in ["BF", "LP"]:
+        method = input(f"\nInput method (must be a valid method): ").strip().upper()
+        if method in PACING_PLAN_METHODS:
             break
         else:
-            print("Invalid input. Please enter 'BF' for Brute Force or 'LP' for Linear Programming.")
+            print("Invalid input. Available methods: " + ", ".join(PACING_PLAN_METHODS.keys()))
     return new_m_paces, method
 
 def main():
@@ -98,20 +110,15 @@ def main():
     except Exception as e:
         print(plot_path)
         raise(e)
+
     if verbose:
         print('\nCreating Pacing Plan\n')
+
     target_time = args.time
     current_m_paces = args.paces
-    if args.method == "brute_force":
-        plan = PacingPlanBruteForce(course, target_time, current_m_paces)
-        method = 'BF'
-    elif args.method == "linear_programming":
-        plan = PacingPlanLP(course, target_time, current_m_paces)
-        method = 'LP'
-    else:
-        raise ValueError(f"Unknown pacing plan method: {args.method}")
-    if verbose:
-        print(f'\nCreating Pacing Plan using {args.method} method\n')
+    method = args.method
+    pacing_plan_class = PACING_PLAN_METHODS[method]
+    plan = pacing_plan_class(course, target_time, current_m_paces)
 
     pacing_plan_directory = os.path.join(course_directory, method)
     if not os.path.exists(pacing_plan_directory):
@@ -124,21 +131,25 @@ def main():
         if not is_first_iter:
             old_method = method
             new_m_paces, method = get_new_inputs()
+            pacing_plan_class = PACING_PLAN_METHODS[method]
             plan.change_total_paces(new_m_paces)
             current_m_paces = new_m_paces
             if old_method != method:
-                plan = PacingPlanBruteForce(course, target_time, current_m_paces) if method == 'BF' else PacingPlanLP(course, target_time, current_m_paces)
-        
+                # Re-initialize the plan if the method has changed
+                plan = pacing_plan_class(course, target_time, current_m_paces)
+
         plan_identifier = f'{target_time:.0f}min_{current_m_paces}p'
+        
         if verbose:
             print('\nRunning Algorithm\n')
+        
         plan.calculate_recommendations(verbose)
 
         file_path = {
-            'geojson': os.path.join(pacing_plan_directory + '/' + plan_identifier + '.json'),
-            'plot': os.path.join(pacing_plan_directory + '/' + plan_identifier + '.jpg'),
-            'plan_segments': os.path.join(pacing_plan_directory + '/' + plan_identifier + '_segments.json'),
-            'plan_miles': os.path.join(pacing_plan_directory +  '/' +plan_identifier + "_miles.json")
+            'geojson': os.path.join(pacing_plan_directory, f'{plan_identifier}.json'),
+            'plot': os.path.join(pacing_plan_directory, f'{plan_identifier}.jpg'),
+            'plan_segments': os.path.join(pacing_plan_directory, f'{plan_identifier}_segments.txt'),
+            'plan_miles': os.path.join(pacing_plan_directory, f'{plan_identifier}_miles.csv')
         }
 
         plan.gen_geojson(file_path['geojson'], use_loop)
@@ -152,6 +163,6 @@ def main():
         if repeat:
             repeat = bool(int(input('\nCreate another pace plan? 0/1\t')))
         is_first_iter = False
-        
+
 if __name__ == '__main__':
     main()

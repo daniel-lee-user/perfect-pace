@@ -61,17 +61,18 @@ document.getElementById('fileInput').addEventListener('change', async function (
         const zip = await JSZip.loadAsync(blob);
 
         const jsonFile = await zip.file(/.*\.json/)[0].async("text");
-        const txtFile = await zip.file(/.*\.txt/)[0].async("text");
+        const mileTxtFile = await zip.file(/.*_mile\.txt/)[0]?.async("text");
+        const regularTxtFile = await zip.file(/^(?!.*_mile).*\.txt/)[0]?.async("text");
+
         const jsonData = JSON.parse(jsonFile);
 
         // right now I save the geojson data and text file content to local storage, might 
         // need to change it if this related data becomes > 5MB
         modifyGeoJSON(jsonData);
         // save in localstorage to pass to map
-        sessionStorage.setItem('textFileContent', txtFile);
-
-        //console.log("Pacing plan generated:", jsonData);
-        //console.log("TEXT DATA:", txtFile);
+        sessionStorage.setItem('textFileContent', regularTxtFile);
+        sessionStorage.setItem('mileTextContent', mileTxtFile);
+        console.log(mileTxtFile);
     } catch (error) {
         console.error('Error:', error);
         // only feed in regular gpx file if algorithm fails for some reason
@@ -80,7 +81,7 @@ document.getElementById('fileInput').addEventListener('change', async function (
     } finally {
         document.getElementById('loadingScreen').style.display = 'none';
         fileInput.value = '';
-        window.location.href = 'map.html';
+        //window.location.href = 'map.html';
     }
 
     function modifyGeoJSON(geojson) {

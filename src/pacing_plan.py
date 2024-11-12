@@ -136,7 +136,7 @@ class PacingPlan(ABC):
             
             pace = self.true_paces_full[start_idx]
             
-            coords = [[seg.start_lat, seg.start_lon, seg.start_ele] for seg in all_segments]
+            coords = [[seg.start_lon, seg.start_lat, seg.start_ele] for seg in all_segments]
             if(i == len(all_changes)-1 and loop):
                 # if last segment and loop is true
                 first_seg = self.race_course.segments[0]

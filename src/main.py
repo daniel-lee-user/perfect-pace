@@ -87,7 +87,7 @@ def main():
     if verbose:
         print(f'\n{str(course)}')
 
-    course_directory = os.path.join("results", course_name)
+    course_directory = os.path.dirname(file_path)+'/results/'+course_name +'/'
     if not os.path.exists(course_directory):
         os.makedirs(course_directory)
 

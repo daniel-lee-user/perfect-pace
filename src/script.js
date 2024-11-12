@@ -60,9 +60,14 @@ document.getElementById('fileInput').addEventListener('change', async function (
         const blob = await response.blob();
         const zip = await JSZip.loadAsync(blob);
 
-        const jsonFile = await zip.file(/.*\.json/)[0].async("text");
-        const mileTxtFile = await zip.file(/.*_mile\.txt/)[0]?.async("text");
-        const regularTxtFile = await zip.file(/^(?!.*_mile).*\.txt/)[0]?.async("text");
+        // Extract the JSON file
+        const jsonFile = await zip.file(/.*\.json$/)[0]?.async("text");
+
+        // Extract the miles CSV file
+        const mileCsvFile = await zip.file(/.*_miles\.csv$/)[0]?.async("text");
+
+        // Extract the regular segments TXT file
+        const regularTxtFile = await zip.file(/.*_segments\.txt$/)[0]?.async("text");
 
         const jsonData = JSON.parse(jsonFile);
 
@@ -71,8 +76,9 @@ document.getElementById('fileInput').addEventListener('change', async function (
         modifyGeoJSON(jsonData);
         // save in localstorage to pass to map
         sessionStorage.setItem('textFileContent', regularTxtFile);
-        sessionStorage.setItem('mileTextContent', mileTxtFile);
-        console.log(mileTxtFile);
+        sessionStorage.setItem('mileTextContent', mileCsvFile);
+        console.log(mileCsvFile);
+        console.log(regularTxtFile)
     } catch (error) {
         console.error('Error:', error);
         // only feed in regular gpx file if algorithm fails for some reason
@@ -81,7 +87,7 @@ document.getElementById('fileInput').addEventListener('change', async function (
     } finally {
         document.getElementById('loadingScreen').style.display = 'none';
         fileInput.value = '';
-        //window.location.href = 'map.html';
+        window.location.href = 'map.html';
     }
 
     function modifyGeoJSON(geojson) {
@@ -139,6 +145,7 @@ document.getElementById('fileInput').addEventListener('change', async function (
 
         // Store the modified GeoJSON in local storage
         sessionStorage.setItem('geoData', JSON.stringify(geojson));
+        console.log(JSON.stringify(geojson))
 
         console.log("GeoJSON modified with segmented features and stored.");
     }

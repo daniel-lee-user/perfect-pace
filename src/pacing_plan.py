@@ -118,7 +118,7 @@ class PacingPlan(ABC):
             pace = self.true_paces_full[i]
             dist = self.race_course.distances[i]
             time = pace * dist
-            elevation = self.race_course.elevations[i] # feet
+            elevation = self.race_course.start_elevations[i] # feet
         
             display_txt += f"{i}, {pace}, {lat}, {lon}, {elevation}, {dist}, {time} \n"
         return display_txt
@@ -134,7 +134,7 @@ class PacingPlan(ABC):
         all_changes = self.critical_segments
         if (all_changes[-1] != self.get_n_segments()):
             all_changes = np.append(all_changes, self.get_n_segments())
-        
+
         for start, end in zip(all_changes, all_changes[1:]):
             pace = self.true_paces_full[start]
             lats = self.race_course.lats[start:end+1]
@@ -146,7 +146,7 @@ class PacingPlan(ABC):
 
             if(end == self.get_n_segments() and loop):
                 coords.append([self.race_course.lons[0],self.race_course.lats[0],self.race_course.elevations[0]])
-            
+
             # Create a feature for each segment
             feature = {
                 "type": "Feature",
@@ -356,7 +356,7 @@ class PacingPlanBF(PacingPlan):
     def __init__(self,race_course : race_course.RaceCourse, target_time, total_paces):
         super().__init__(race_course, target_time, total_paces)
         n = self.get_n_segments()
-        self.MIN_SEGMENT_LENGTH = 5 # TODO: test different values of this parameter; dynamically change its initialization based off the race course
+        self.MIN_SEGMENT_LENGTH = 3 # TODO: test different values of this parameter; dynamically change its initialization based off the race course
         self.WP = np.zeros((n,n+1))
         self.LOSS = np.ones((n, n+1, total_paces)) * np.inf
         self.OPT = np.ones((n, n+1, total_paces)).astype(int)*-1

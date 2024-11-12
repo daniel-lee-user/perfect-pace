@@ -1,9 +1,19 @@
 import numpy as np
 from enum import Enum
+import math
 
 class Unit(Enum):
     METRIC = 1
     IMPERIAL = 2
+
+class SmoothingMethod(Enum):
+    BOX = 1
+    GAUSSIAN = 2
+
+class SegmentType(Enum):
+    UNIFORM = 1
+    VARIABLE = 2
+    FIXED_LENGTH = 3
 
 class Conversions(Enum):
     METERS_TO_MILES = 0.0006213712
@@ -48,6 +58,23 @@ def get_pace_adjustment_scalar(grade):
 def get_pace_adjustments(grades):
     vf = np.vectorize(get_pace_adjustment_scalar)
     return vf(grades)
+
+def calculate_distance_scalar(start_lat, start_lon, end_lat, end_lon):
+        radius = 6371
+        lat1, lon1, lat2, lon2 = map(math.radians, [start_lat, start_lon, end_lat, end_lon])
+        dlat = lat2 - lat1
+        dlon = lon2 - lon1
+        a = math.sin(dlat / 2)**2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2)**2
+        c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+        distance = radius * c * 1000
+        return distance
+
+calculate_distance = np.vectorize(calculate_distance_scalar)
+
+def calculate_grade_scalar(elevation_change, distance):
+        return elevation_change / distance * 100
+
+calculate_grade = np.vectorize(calculate_grade_scalar)
 
 def cprint(text: str, bkd_color: str = "cyan"):
     '''

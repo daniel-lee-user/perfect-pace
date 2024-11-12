@@ -7,3 +7,7 @@ notebooks/.ipynb_checkpoints
 .DS_Store/node_modules
 .ipynb_checkpoints
 results/
+.DS_Store
+.venv/
+local_testing/
+src/.DS_Store

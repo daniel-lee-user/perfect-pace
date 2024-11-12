@@ -1,0 +1,8 @@
+{
+  "dependencies": {
+    "@mapbox/togeojson": "^0.16.2",
+    "leaflet": "^1.9.4",
+    "leaflet.elevation": "^0.0.3",
+    "leaflet.heightgraph": "^1.4.0"
+  }
+}

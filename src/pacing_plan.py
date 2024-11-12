@@ -132,6 +132,19 @@ class PacingPlan(ABC):
         all_changes = self.critical_segments
         if(all_changes[len(all_changes)-1] != self.get_n_segments()-1):
             all_changes = np.append(all_changes, self.get_n_segments()-1)
+        start_idx = all_changes[0] # assuming changes always starts at 0
+        for i in range(1, len(all_changes)):
+            all_segments = []
+            for j in range(start_idx, all_changes[i]+1):
+                all_segments.append(self.race_course.segments[j])
+            
+            pace = self.true_paces_full[start_idx]
+            
+            coords = [[seg.start_lon, seg.start_lat, seg.start_ele] for seg in all_segments]
+            if(i == len(all_changes)-1 and loop):
+                # if last segment and loop is true
+                first_seg = self.race_course.segments[0]
+                coords.append([first_seg.start_lon, first_seg.start_lat, first_seg.start_ele])
 
         for start, end in zip(all_changes, all_changes[1:]):
             pace = self.true_paces_full[start]
@@ -190,6 +203,40 @@ class PacingPlan(ABC):
         display_txt += f"\nTotal time: {self.target_time :.2f}"
 
         return display_txt
+
+    def gen_abbrev_plan_json(self, file_path):
+        """
+        Generates a simplified .json pacing plan that includes just the different pace segments.
+        """
+        segments = []
+
+        for i, pace in enumerate(self.true_paces_abbrev):
+            segment = {
+                "segment_num": i,
+                "start_distance": "{:.2f}".format(self.race_course.start_distances[self.critical_segments[i]]),
+                "pace": utils.get_pace_display_text(pace),
+                "distance": "{:.2f}".format(self.elapsed_dists[i])
+            }
+
+            # Include latitude and longitude if race_course is of type RealRaceCourse
+            if self.race_course is type(race_course.RealRaceCourse):
+                segment["lat_lon"] = {
+                    "latitude": self.race_course.lats[i],
+                    "longitude": self.race_course.lons[i]
+                }
+
+            segments.append(segment)
+
+        result = {
+            "course_name": self.race_course.course_name,
+            "target_time": self.target_time,
+            "segments": segments,
+            "total_time": self.target_time
+        }
+
+        with open(file_path, 'w') as geojson_file:
+            json.dump(result, geojson_file, indent=4)
+        return result
     
     """Returns a .csv pace plan in the following schema:
      [mile_idx], [pace], [time_per_mile], [elapsed_time], [distance (miles)]
@@ -224,6 +271,39 @@ class PacingPlan(ABC):
         with open(file_path, 'w') as f:
             f.write(display_txt)
         return display_txt
+    
+    def gen_plan_per_mile_json(self, file_path):
+        """Returns a .json pace plan in the following schema:
+        [mile_idx], [pace], [time_per_mile], [elapsed_time], [distance (miles)]
+        """
+        n_mile_markers = math.ceil(self.race_course.total_distance)
+        distance = np.ones(n_mile_markers)
+        distance[-1] = self.race_course.total_distance - n_mile_markers + 1
+        time_per_mile = np.multiply(distance, self.pace_per_mile)
+        elapsed_time = np.cumsum(time_per_mile)
+        
+        segments = []
+        for i in range(n_mile_markers):
+            segment = {
+                "mile_index": i,
+                "pace_per_mile": utils.get_pace_display_text(self.pace_per_mile[i]),
+                "time_per_mile": time_per_mile[i],
+                "elapsed_time": elapsed_time[i],
+                "distance": distance[i]
+            }
+            segments.append(segment)
+
+        result = {
+            "course_name": self.race_course.course_name,
+            "target_time": self.target_time,
+            "segments": segments,
+            "total_time": self.true_total_time
+        }
+
+        with open(file_path, 'w') as geojson_file:
+            json.dump(result, geojson_file, indent=4)
+        return result
+
 
     def gen_pace_chart(self, file_path, incl_elevation=True, incl_opt_paces=False, incl_true_paces=True, incl_opt_pace_per_mile=False, incl_true_pace_per_mile=False):
         if not (incl_elevation or incl_opt_paces or incl_true_paces or incl_opt_pace_per_mile or incl_true_pace_per_mile):

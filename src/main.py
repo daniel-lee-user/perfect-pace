@@ -99,7 +99,7 @@ def main():
     if verbose:
         print(f'\n{str(course)}')
 
-    course_directory = os.path.join("results", course_name)
+    course_directory = os.path.dirname(file_path)+'/results/'+course_name +'/'
     if not os.path.exists(course_directory):
         os.makedirs(course_directory)
 
@@ -154,10 +154,11 @@ def main():
 
         plan.gen_geojson(file_path['geojson'], use_loop)
         plan.gen_pace_chart(file_path['plot'], incl_opt_paces=True, incl_true_paces=True)
-        plan.gen_plan_per_mile(file_path["plan_miles"], use_csv=False)
-        
-        with open(file_path['plan_segments'], 'w') as f:
-            f.write(plan.gen_abbrev_plan())
+        #plan.gen_plan_per_mile(file_path["plan_miles"], use_csv=False)
+        plan.gen_plan_per_mile_json(file_path["plan_miles"])
+        plan.gen_abbrev_plan_json(file_path['plan_segments'])
+        #with open(file_path['plan_segments'], 'w') as f:
+        #    f.write(plan.gen_abbrev_plan())
 
         if repeat:
             repeat = bool(int(input('\nCreate another pace plan? 0/1\t')))

@@ -4,9 +4,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 import math
 from gpx_parser import Segment
+import scipy
 from scipy import ndimage
-from utils import cprint, Conversions, Unit, SegmentType, SmoothingMethod
 from scipy.ndimage import gaussian_filter1d
+from utils import cprint, Conversions, Unit, SegmentType, SmoothingMethod
 import warnings
 
 import os
@@ -40,20 +41,37 @@ class SegmentView:
         else:
             self.grades = grades
 
+        # use this to get a full distribution ... 
+        # TODO: Edit placeholder code: lats and lons are still in a reasonable ballpark; need to replace with better algorithm
+        self.interpolate_func = {
+            "elevations" : scipy.interpolate.interp1d(self.distances, self.elevations, 'linear'),
+            "lats" : scipy.interpolate.interp1d(self.distances, self.lats, 'linear'),
+            "lons" : scipy.interpolate.interp1d(self.distances, self.lons, 'linear'),
+        } 
+
     @classmethod
-    def create_interpolated_view(cls, view, n_segments):
-        if view.units == Unit.IMPERIAL:
-            raise ValueError("can only interpolate on metric units")
-        x_step = view.total_distance / n_segments
-        full_distances = np.arange(n_segments+1) * x_step
-        segment_lengths = np.full(n_segments, x_step)
-        elevations = np.interp(full_distances, view.distances, view.elevations)
-        # Placeholder code: lats and lons are still in a reasonable ballpark; need to replace with better algorithm
-        lats = np.interp(full_distances, view.distances, view.lats)
-        lons = np.interp(full_distances, view.distances, view.lons)
+    def create_interpolated_view(cls, view, segment_type : SegmentType, param):
+        if segment_type == SegmentType.FIXED_LENGTH:
+            x_step = param
+            n_segments = int(view.total_distance / x_step) + 1
+            full_distances = np.arange(n_segments+1) * x_step
+            full_distances[-1] = view.total_distance
+            segment_lengths = np.diff(full_distances)
+        elif segment_type == SegmentType.UNIFORM:
+            n_segments = param
+            x_step = view.total_distance / n_segments
+            full_distances = np.arange(n_segments+1) * x_step
+            segment_lengths = np.full(n_segments, x_step)
+        else:
+            raise ValueError('can only interpolate with uniform or fixed-length segments')
         
-        return cls(SegmentType.UNIFORM, view.units, lats, lons, segment_lengths, elevations)
-    
+        # TODO: experiment with other interpolation methods
+        elevations = view.interpolate_func["elevations"](full_distances)
+        lats = view.interpolate_func["lats"](full_distances)
+        lons = view.interpolate_func["lons"](full_distances)
+
+        return cls(SegmentType.FIXED_LENGTH, view.units, lats, lons, segment_lengths, elevations)
+
     @classmethod
     def create_smoothed_view(cls, view, method : SmoothingMethod=SmoothingMethod.GAUSSIAN):
         if view.units == Unit.IMPERIAL:
@@ -210,7 +228,7 @@ class RaceCourse:
 
 class RealRaceCourse(RaceCourse):
 
-    def __init__(self, name, file_path):
+    def __init__(self, name, file_path, N_SEGMENTS=200):
         super().__init__(name)
 
         self.segments = gpx_parser.parse_gpx(file_path) # remove after all references to segments are removed
@@ -235,9 +253,9 @@ class RealRaceCourse(RaceCourse):
         lats = lats[valid_indices_appended]
         lons = lons[valid_indices_appended]
         elevations = raw_elevations[valid_indices_appended]
-        
         metric_view = SegmentView(SegmentType.VARIABLE, Unit.METRIC, lats, lons, segment_lengths, elevations)
-        interpolated_view = SegmentView.create_interpolated_view(metric_view, 300) # TODO: remove the hard-coded segment value here
+        interpolated_view = SegmentView.create_interpolated_view(metric_view, SegmentType.UNIFORM, N_SEGMENTS) 
+        # interpolated_view = SegmentView.create_interpolated_view(metric_view, SegmentType.FIXED_LENGTH, 200)
         smoothed_view = SegmentView.create_smoothed_view(interpolated_view, SmoothingMethod.GAUSSIAN)
         imperial_view = SegmentView.create_imperial_view(smoothed_view)
         self.change_view(imperial_view)
@@ -252,6 +270,7 @@ class RealRaceCourse(RaceCourse):
         self.start_distances = view.start_distances
         self.end_distances = view.end_distances
         self.total_distance = view.total_distance
+        self.elevations = view.elevations
         self.start_elevations = view.start_elevations
         self.end_elevations = view.end_elevations
         self.elevation_changes = view.elevation_changes
@@ -354,10 +373,16 @@ class RandomRaceCourse(RaceCourse):
         self.end_elevations -= min_val
     
 def main():
-    file_path = 'data/boston.gpx'
-    course_name = os.path.basename(file_path).split('.')[0]
-    course = RealRaceCourse(course_name, file_path)
-    print(course)
+    for course_name in ['FH-Fox', 'boston', 'wineglass', 'lakefront', 'staten-half-elev']:
+        file_path = f'data/{course_name}.gpx'
+        course_name = os.path.basename(file_path).split('.')[0]
+        for N_SEGMENTS in [125, 250, 500, 1000]:
+            course = RealRaceCourse(course_name, file_path, N_SEGMENTS)
+            directory = f'results/{course_name}/linear'
+            if not os.path.exists(directory):
+                os.makedirs(directory)
+            course.gen_course_plot(f'{directory}/{N_SEGMENTS}.png')
+            print(course)
 
 if __name__ == '__main__':
     main()

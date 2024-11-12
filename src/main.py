@@ -148,8 +148,8 @@ def main():
         file_path = {
             'geojson': os.path.join(pacing_plan_directory, f'{plan_identifier}.json'),
             'plot': os.path.join(pacing_plan_directory, f'{plan_identifier}.jpg'),
-            'plan_segments': os.path.join(pacing_plan_directory, f'{plan_identifier}_segments.txt'),
-            'plan_miles': os.path.join(pacing_plan_directory, f'{plan_identifier}_miles.csv')
+            'plan_segments': os.path.join(pacing_plan_directory, f'{plan_identifier}_segments.json'),
+            'plan_miles': os.path.join(pacing_plan_directory, f'{plan_identifier}_miles.json')
         }
 
         plan.gen_geojson(file_path['geojson'], use_loop)

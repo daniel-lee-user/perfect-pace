@@ -4,11 +4,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import math
 from gpx_parser import Segment
-import scipy
 from scipy import ndimage
-from utils import cprint, Conversions, Unit, SegmentType, SmoothingMethod
-from scipy.ndimage import gaussian_filter1d
-import warnings
+from utils import Conversions, Unit, SegmentType
 import segments
 
 import os

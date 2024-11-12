@@ -57,6 +57,13 @@ def get_pace_adjustments(grades):
     vf = np.vectorize(get_pace_adjustment_scalar)
     return vf(grades)
 
+def calculate_grade_scalar(elevation_change, distance):
+        return elevation_change / distance * 100
+
+def calculate_grade(elevation_changes, distances):
+    vf = np.vectorize(calculate_grade_scalar)
+    return vf(elevation_changes, distances)
+
 def cprint(text: str, bkd_color: str = "cyan"):
     '''
     Prints colored bkd text to terminal.

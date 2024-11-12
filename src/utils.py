@@ -12,6 +12,7 @@ class SmoothingMethod(Enum):
 class SegmentType(Enum):
     UNIFORM = 1
     VARIABLE = 2
+    FIXED_LENGTH = 3
 
 class Conversions(Enum):
     METERS_TO_MILES = 0.0006213712

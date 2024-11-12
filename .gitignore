@@ -2,5 +2,11 @@ __pycache__
 data
 node_modules
 test
+.DS_Store
 .DS_Store/node_modules
-__pycache__
+.ppace
+.ipynb_checkpoints
+results/
+src/.DS_Store
+.venv/
+local_testing/

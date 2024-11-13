@@ -1,0 +1,37 @@
+{
+    "course_name": "wineglass",
+    "target_time": 180,
+    "segments": [
+        {
+            "segment_num": 0,
+            "start_distance": "0.00",
+            "pace": "6:45",
+            "distance": "4.72"
+        },
+        {
+            "segment_num": 1,
+            "start_distance": "4.72",
+            "pace": "6:58",
+            "distance": "1.01"
+        },
+        {
+            "segment_num": 2,
+            "start_distance": "5.73",
+            "pace": "6:44",
+            "distance": "8.51"
+        },
+        {
+            "segment_num": 3,
+            "start_distance": "14.24",
+            "pace": "7:09",
+            "distance": "0.41"
+        },
+        {
+            "segment_num": 4,
+            "start_distance": "14.65",
+            "pace": "6:45",
+            "distance": "11.94"
+        }
+    ],
+    "total_time": 180
+}

@@ -1,7 +1,7 @@
 import argparse
 import os
 import race_course
-from pacing_plan import PacingPlanBFAbsolute, PacingPlanBFSquare, PacingPlanAvgPacePerMile, PacingPlanAvgPace
+from pacing_plan import PacingPlanBFAbsolute, PacingPlanBFSquare, PacingPlanAvgPacePerMile, PacingPlanAvgPace, PacingPlanSegmenting
 from pacing_plan_lp import PacingPlanLPAbsolute, PacingPlanLPSquare
 
 PACING_PLAN_METHODS = {
@@ -10,7 +10,8 @@ PACING_PLAN_METHODS = {
     "LPA": PacingPlanLPAbsolute,
     "LPS": PacingPlanLPSquare,
     "APPM": PacingPlanAvgPacePerMile,
-    "AP": PacingPlanAvgPace
+    "AP": PacingPlanAvgPace,
+    "SEG": PacingPlanSegmenting
 }
 
 def init_parser() -> argparse.ArgumentParser:
@@ -99,7 +100,7 @@ def main():
     if verbose:
         print(f'\n{str(course)}')
 
-    course_directory = os.path.dirname(file_path)+'/results/'+course_name +'/'
+    course_directory = os.path.dirname(file_path)+'/../'+'/results/'+course_name +'/'
     if not os.path.exists(course_directory):
         os.makedirs(course_directory)
 
@@ -141,7 +142,7 @@ def main():
         plan_identifier = f'{target_time:.0f}min_{current_m_paces}p'
         
         if verbose:
-            print('\nRunning Algorithm\n')
+            print(f'\nRunning Algorithm: {method}\n')
         
         plan.calculate_recommendations(verbose)
 

@@ -76,6 +76,16 @@ def calculate_grade_scalar(elevation_change, distance):
 
 calculate_grade = np.vectorize(calculate_grade_scalar)
 
+def calculate_segment_pace(start, end, distances, paces):
+    total_distance = sum(distances[start:end+1])
+    total_time = paces[start:end+1] @ distances[start:end+1]
+    return total_time/total_distance
+
+def calculate_segment_grade(start, end, elevations, distances):
+    total_distance = sum(distances[start:end+1])
+    total_elevation = sum(elevations[start:end+1])
+    return calculate_grade_scalar(total_elevation, total_distance)
+
 def cprint(text: str, bkd_color: str = "cyan"):
     '''
     Prints colored bkd text to terminal.

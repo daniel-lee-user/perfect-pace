@@ -223,10 +223,12 @@ class PacingPlan(ABC):
             json.dump(result, geojson_file, indent=4)
         return result
     
-    """Returns a .csv pace plan in the following schema:
-     [mile_idx], [pace], [time_per_mile], [elapsed_time], [distance (miles)]
-       """
+    
     def gen_plan_per_mile(self, file_path, use_csv=False):
+        """
+        Returns a .csv pace plan in the following schema:
+        [mile_idx], [pace], [time_per_mile], [elapsed_time], [distance (miles)]
+        """
         n_mile_markers = math.ceil(self.race_course.total_distance)
         distance = np.ones(n_mile_markers)
         distance[-1] = self.race_course.total_distance - n_mile_markers + 1
@@ -258,7 +260,8 @@ class PacingPlan(ABC):
         return display_txt
     
     def gen_plan_per_mile_json(self, file_path):
-        """Returns a .json pace plan in the following schema:
+        """
+        Returns a .json pace plan in the following schema:
         [mile_idx], [pace], [time_per_mile], [elapsed_time], [distance (miles)]
         """
         n_mile_markers = math.ceil(self.race_course.total_distance)
@@ -479,3 +482,147 @@ class PacingPlanAvgPace(PacingPlan):
         avg_pace = self.target_time / self.race_course.total_distance
         self.true_paces_full[:] = avg_pace
         return self.true_paces_full
+
+class PacingPlanSegmenting(PacingPlan):
+    MIN_HILL_DISTANCE = 350*utils.Conversions.METERS_TO_MILES.value # 350 Meters in Miles
+    MIN_HILL_HEIGHT = 30    # Feet
+    MIN_UPHILL_GRADE = 2    # Grade (smoothed)
+    MIN_DOWNHILL_GRADE = 3  # Grade (smoothed)
+    MIN_SEGMENT_LENGTH = .25    # Miles
+    
+    def __init__(self, race_course, target_time, total_paces):
+        super().__init__(race_course, target_time, total_paces)
+        
+    def _calculate_recommendations(self, verbose):
+        self.race_course.smoothen_segments(smoothen="gaussian") # Window should be 3
+        grades = self.race_course.grades
+        start_distances = self.race_course.start_distances
+        end_distances = self.race_course.end_distances
+        elevations = self.race_course.elevations
+        distances = self.race_course.segment_lengths
+        
+        uphills, downhills = PacingPlanSegmenting.detect_hills(grades, start_distances, end_distances, elevations, 
+            PacingPlanSegmenting.MIN_UPHILL_GRADE, PacingPlanSegmenting.MIN_DOWNHILL_GRADE, PacingPlanSegmenting.MIN_HILL_DISTANCE, PacingPlanSegmenting.MIN_HILL_HEIGHT)
+
+        segments = PacingPlanSegmenting.get_spanning_segments(distances, elevations*utils.Conversions.FEET_TO_MILES.value, uphills, downhills, PacingPlanSegmenting.MIN_SEGMENT_LENGTH)
+        self.segments = segments
+        for segment in segments:
+            start, end = segment
+            self.true_paces_full[start:end+1] = utils.calculate_segment_pace(start, end, distances, self.optimal_paces)
+        return self.true_paces_full
+
+    @staticmethod
+    def detect_hills(grades, start_distances, end_distances, elevations, uphill_cutoff, downhill_cutoff, min_length, min_height):    
+        significant_uphills = (grades >= uphill_cutoff)
+        significant_downhills = (grades <= -downhill_cutoff)
+
+        uphill_segments = PacingPlanSegmenting.find_continuous_segments(significant_uphills, grades)
+        downhill_segments = PacingPlanSegmenting.find_continuous_segments(significant_downhills, -grades)
+        
+        filtered_uphill_segments = PacingPlanSegmenting.filter_short_segments(uphill_segments, min_length, start_distances, end_distances)
+        filtered_downhill_segments = PacingPlanSegmenting.filter_short_segments(downhill_segments, min_length, start_distances, end_distances)
+        
+        filtered_uphill_segments = PacingPlanSegmenting.filter_short_hills(filtered_uphill_segments, min_height, elevations)
+        filtered_downhill_segments = PacingPlanSegmenting.filter_short_hills(filtered_downhill_segments, min_height, elevations)
+
+        return filtered_uphill_segments, filtered_downhill_segments
+    
+    @staticmethod
+    def filter_short_segments(segments, min_length, start_distances, end_distances):
+        return [(start, end) for start, end in segments if end_distances[end] - start_distances[start] >= min_length]
+
+    @staticmethod
+    def filter_short_hills(segments, min_height, elevations):
+        result = [(start, end) for start, end in segments if max(elevations[start:end+1]) - min(elevations[start:end+1]) >= min_height]
+        return result
+    
+    @staticmethod
+    def find_continuous_segments(hills, grades):
+        segments = []
+        start = None
+        n = len(hills)
+        i = 0
+        
+        while i < n:
+            is_significant = hills[i]
+            if is_significant:
+                if start is None:
+                    start = i
+                i += 1
+            else:
+                i += 1
+                if start is not None:
+                    adjusted_start = PacingPlanSegmenting.adjust_point(start, grades, -1)
+                    adjusted_end = PacingPlanSegmenting.adjust_point(i - 2, grades, 1)
+                    segments.append((adjusted_start, adjusted_end))
+                    start = None
+                    i = adjusted_end + 1
+                    
+        if start is not None:
+            adjusted_start = PacingPlanSegmenting.adjust_point(start, grades, -1)
+            adjusted_end = n - 1
+            segments.append((adjusted_start, adjusted_end))
+
+        return segments
+
+    @staticmethod
+    def adjust_point(index, grades, coeff=1):
+        n = len(grades)
+        while index > 0 and index < n-1 and grades[index + coeff] >= 0:
+            index += coeff
+        return index
+
+    @staticmethod
+    def get_spanning_segments(distances, elevations, uphill_segments, downhill_segments, min_segment_length):
+        all_segments = sorted(uphill_segments + downhill_segments, key=lambda x: x[0])
+        full_course_segments = []
+        filler_segments = []
+        total_segments = len(distances)
+        
+        current_start = 0
+        for (start, end) in all_segments:
+            if current_start < start:
+                full_course_segments.append((current_start, start - 1))
+                filler_segments.append((current_start, start - 1))
+            full_course_segments.append((start, end))        
+            current_start = end + 1
+        if current_start < total_segments:
+            full_course_segments.append((current_start, total_segments - 1))
+            filler_segments.append((current_start, total_segments - 1))
+
+        return PacingPlanSegmenting.merge_filler_segments(distances, elevations, filler_segments, full_course_segments, min_segment_length)
+
+    @staticmethod
+    def merge_filler_segments(distances, elevations, filler_segments, full_course_segments, min_segment_length):
+        merged_segments = []
+        remove_next_segment = False
+        for i, (start, end) in enumerate(full_course_segments):
+            if (start, end) in filler_segments:
+                segment_distance = sum(distances[start:end+1])
+                if segment_distance < min_segment_length:
+                    prev_segment = full_course_segments[i-1] if i > 0 else None
+                    next_segment = full_course_segments[i+1] if i < len(full_course_segments) - 1 else None
+
+                    segment_grade = utils.calculate_segment_grade(start, end, elevations, distances)
+                    prev_grade = utils.calculate_segment_grade(prev_segment[0], prev_segment[1], elevations, distances) if prev_segment else None
+                    next_grade = utils.calculate_segment_grade(next_segment[0], next_segment[1], elevations, distances) if next_segment else None
+
+                    prev_grade_distance = abs(prev_grade - segment_grade) if prev_segment else None
+                    next_grade_distance = abs(next_grade - segment_grade) if next_segment else None
+                    
+                    # Merge with the more similar adjacent segment
+                    if prev_segment and (prev_grade_distance <= next_grade_distance or not next_segment):
+                        merged_segments[-1] = (prev_segment[0], end)
+                    elif next_segment:
+                        merged_segments.append(start, next_segment[1]) # Assume next segment is not in filler
+                        remove_next_segment = True
+                    else:
+                        merged_segments.append((start, end))
+                else:
+                    merged_segments.append((start, end))
+            else:
+                if remove_next_segment:
+                    remove_next_segment = False
+                else:
+                    merged_segments.append((start, end))
+        return merged_segments

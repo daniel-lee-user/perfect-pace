@@ -73,7 +73,7 @@ class RaceCourse:
         elif smoothen == "loess":
             raise RuntimeError(f"Unimplemented smoothening argument: {smoothen}")
         elif smoothen == "gaussian":
-            gaus_sigma = 5    # TODO find a better value?
+            gaus_sigma = 3    # TODO find a better value?
             self.grades = np.array(ndimage.gaussian_filter1d(self.grades, gaus_sigma))
         else:
             raise RuntimeError(f"Unrecognized smmothening argument: {smoothen}!")
@@ -127,10 +127,12 @@ class RealRaceCourse(RaceCourse):
         elevations = raw_elevations[valid_indices_appended]
 
         metric_view = segment_view.SegmentViewMetric(SegmentType.VARIABLE, lats, lons, segment_lengths, elevations)
+        imperial_view = segment_view.SegmentViewImperial(metric_view)
         interpolated_unif = segment_view.SegmentViewInterpUniform(metric_view, N_SEGMENTS)
-        smoothed_gaussian = segment_view.SegmentViewSmoothedGaussian(interpolated_unif, sigma =1)
+        smoothed_gaussian = segment_view.SegmentViewSmoothedGaussian(interpolated_unif, sigma = 3)
         final_imperial = segment_view.SegmentViewImperial(smoothed_gaussian)
-        self.change_view(final_imperial)
+        # self.change_view(final_imperial)
+        self.change_view(imperial_view)
 
     def change_view(self, view: segment_view.SegmentView):
         self.n_segments = view.n_segments

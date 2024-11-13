@@ -29,4 +29,4 @@ Flags:
 -h              ==> opens help menu
 ```
 
-Example: `python src/main.py -f "data/Lakefront-Loops-5K.gpx" -t 20 -p 6 -m "brute_force"`
+Example: `python src/main.py -f "data/Lakefront-Loops-5K.gpx" -t 20 -p 6 -m "BF"`

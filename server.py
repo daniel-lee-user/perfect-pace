@@ -34,7 +34,7 @@ def upload_file():
 
     paces = request.form['paces']
     time = request.form['time']
-    algorithm = 'BFA' if request.form['alg'] == "DP" else 'LPS'
+    algorithm = request.form['alg']
     is_loop = '-l' if request.form.get('loop') == 'true' else ''
 
     # Save the uploaded file temporarily

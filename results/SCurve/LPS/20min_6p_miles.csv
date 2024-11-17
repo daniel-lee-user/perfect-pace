@@ -1,8 +1,0 @@
-SCurve: 20 minute plan
-
-[mile_idx], [pace], [time_per_mile], [elapsed_time], [distance (miles)]
-0 mi 	-1:00/mile 	 -1.0 min 	 -1.0 min 	 1.0 mi
-1 mi 	-1:00/mile 	 -1.0 min 	 -2.0 min 	 1.0 mi
-2 mi 	-1:00/mile 	 -0.5393134754206175 min 	 -2.5393134754206175 min 	 0.5393134754206175 mi
-
-Total time: 20.00

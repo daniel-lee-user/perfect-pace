@@ -2,7 +2,7 @@
 FROM python:3.9
 
 # Expose the application port
-EXPOSE 5000
+EXPOSE 5000/tcp
 
 # Create a parent directory
 WORKDIR /project

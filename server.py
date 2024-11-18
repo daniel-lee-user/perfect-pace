@@ -5,11 +5,17 @@ import shutil
 import os
 import tempfile
 import zipfile
+from flask_cors import CORS
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 
 app = Flask(__name__)
-CORS(app)  # Enable CORS for all routes
+CORS(app, origins="https://daniel-lee-user.github.io/perfect-pace/")  # Allow requests from GitHub Pages
+
+limiter = Limiter(get_remote_address, app=app, default_limits=["200 per day", "50 per hour"])
 
 @app.route('/upload', methods=['POST'])
+@limiter.limit("10 per minute")
 def upload_file():
     file = request.files.get('file')
     filename = request.form.get('filename')
@@ -85,6 +91,7 @@ def upload_file():
     return send_file(zip_file_path, as_attachment=True, mimetype='application/zip')
 
 @app.route('/delete', methods=['DELETE'])
+@limiter.limit("10 per minute")
 def delete_files():
     try:
         # Extract data from the request (paces, time, algorithm, file)
@@ -132,5 +139,12 @@ def delete_files():
         print(f"Error: {e}")
         return jsonify({'error': str(e)}), 500
 
+@limiter.limit("10 per minute")
+@app.route("/")
+def health():
+    return "Healthy"
+
 if __name__ == '__main__':
-    app.run(host="0.0.0.0", port=5000)
+    from waitress import serve
+    serve(app, host="0.0.0.0", port=5000)
+    #app.run(host="0.0.0.0", port=5000)

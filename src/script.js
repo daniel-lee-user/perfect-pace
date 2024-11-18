@@ -59,7 +59,7 @@ document.getElementById('fileInput').addEventListener('change', async function (
         const response = await fetch(url, {
             method: "POST",
             body: formData,
-            signal: AbortSignal.timeout(30000) // 30 second timeout
+            signal: AbortSignal.timeout(60000) // 60 second timeout
         })
 
         const blob = await response.blob();
@@ -114,7 +114,7 @@ document.getElementById('fileInput').addEventListener('change', async function (
                 "alg": algorithm, // Algorithm type (e.g., 'DP' or 'LP')
                 "filename": filename    // Filename to delete
             }),
-            signal: AbortSignal.timeout(30000)
+            signal: AbortSignal.timeout(60000)
         })
             .then(response => response.json()) // Parse the response as JSON
             .then(data => {

@@ -95,6 +95,7 @@ document.getElementById('fileInput').addEventListener('change', async function (
         sessionStorage.setItem('filename', filename);
         document.getElementById('loadingScreen').style.display = 'none';
         fileInput.value = '';
+        // should redirect to map.html
         window.location.href = 'map.html';
     }
 

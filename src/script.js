@@ -54,11 +54,12 @@ document.getElementById('fileInput').addEventListener('change', async function (
 
     try {
         document.getElementById('loadingScreen').style.display = 'block';
-        
+
         const url = 'https://perfect-pace-container.0pr6sav0peebr.us-east-2.cs.amazonlightsail.com:5000/upload';
         const response = await fetch(url, {
             method: "POST",
-            body: formData
+            body: formData,
+            signal: AbortSignal.timeout(30000) // 30 second timeout
         })
 
         const blob = await response.blob();
@@ -112,7 +113,8 @@ document.getElementById('fileInput').addEventListener('change', async function (
                 "time": time,           // Time value
                 "alg": algorithm, // Algorithm type (e.g., 'DP' or 'LP')
                 "filename": filename    // Filename to delete
-            })
+            }),
+            signal: AbortSignal.timeout(30000)
         })
             .then(response => response.json()) // Parse the response as JSON
             .then(data => {

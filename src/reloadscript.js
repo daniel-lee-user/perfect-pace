@@ -32,7 +32,7 @@ document.getElementById('submitBtn').addEventListener('click', async function (e
         const response = await fetch(url, {
             method: "POST",
             body: formData,
-            signal: AbortSignal.timeout(30000)
+            signal: AbortSignal.timeout(60000)
         });
 
         const blob = await response.blob();
@@ -72,7 +72,7 @@ function deleteFile(paces, time, algorithm, filename) {
             "alg": algorithm, // Algorithm type (e.g., 'DP' or 'LP')
             "filename": filename    // Filename to delete
         }),
-        signal: AbortSignal.timeout(30000)
+        signal: AbortSignal.timeout(60000)
     })
         .then(response => response.json()) // Parse the response as JSON
         .then(data => {

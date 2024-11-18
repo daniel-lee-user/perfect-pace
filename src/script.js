@@ -95,7 +95,7 @@ document.getElementById('fileInput').addEventListener('change', async function (
         sessionStorage.setItem('filename', filename);
         document.getElementById('loadingScreen').style.display = 'none';
         fileInput.value = '';
-        //window.location.href = 'map.html';
+        window.location.href = 'map.html';
     }
 
     function deleteFile(paces, time, algorithm, filename) {

@@ -10,13 +10,14 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 
 app = Flask(__name__)
-CORS(app, origins="https://daniel-lee-user.github.io/perfect-pace/")  # Allow requests from GitHub Pages
+CORS(app, origins="*")  # Allow requests from GitHub Pages
 
 limiter = Limiter(get_remote_address, app=app, default_limits=["200 per day", "50 per hour"])
 
 @app.route('/upload', methods=['POST'])
 @limiter.limit("10 per minute")
 def upload_file():
+    print("RECEIVED REQUEST")
     file = request.files.get('file')
     filename = request.form.get('filename')
 

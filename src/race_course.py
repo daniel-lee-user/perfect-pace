@@ -82,15 +82,14 @@ class RaceCourse:
         fig,ax = plt.subplots()
         fig.set_figwidth(20)
         
-        distances = np.insert(self.end_distances, 0,0)
-        ax.plot(distances, self.elevations, label ='elevation', color='blue')
+        ax.plot(self.distances, self.elevations, label ='elevation', color='blue')
         ax.set_xlabel('distance (miles)')
         ax.set_ylabel('elevation (feet)')
         
         ax2 = ax.twinx()
         ax2.set_ylabel('grade (%)')
         full_grades = np.append(self.grades, self.grades[-1])
-        ax2.step(distances, full_grades, label='grade', color='purple', where='post', alpha=0.4)
+        ax2.step(self.distances, full_grades, label='grade', color='purple', where='post', alpha=0.4)
         
         fig.legend(loc="upper left", bbox_to_anchor=(0.125, 0.875))
         ax.set_title(self.course_name)
@@ -138,6 +137,7 @@ class RealRaceCourse(RaceCourse):
         self.lats = view.lats
         self.lons = view.lons
         self.segment_lengths = view.segment_lengths 
+        self.distances = view.distances
         self.start_distances = view.start_distances
         self.end_distances = view.end_distances
         self.total_distance = view.total_distance
@@ -147,20 +147,6 @@ class RealRaceCourse(RaceCourse):
         self.elevation_changes = view.elevation_changes
         self.grades = view.grades
         self.current_view = view
-
-    def convert_metric_to_imperial(self):
-        if self.units == Unit.IMPERIAL:
-            return
-        self.segment_lengths = self.segment_lengths * Conversions.METERS_TO_MILES.value 
-        self.end_distances = self.end_distances * Conversions.METERS_TO_MILES.value
-        self.start_distances =   self.start_distances * Conversions.METERS_TO_MILES.value
-        self.total_distance = self.total_distance * Conversions.METERS_TO_MILES.value
-
-        self.start_elevations = self.start_elevations * Conversions.METERS_TO_FEET.value
-        self.end_elevations = self.end_elevations * Conversions.METERS_TO_FEET.value
-        self.elevation_changes = self.elevation_changes * Conversions.METERS_TO_FEET.value
-        
-        self.units = Unit.IMPERIAL
 
 class RandomRaceCourse(RaceCourse):
     # TODO: hard coded smoothing values 

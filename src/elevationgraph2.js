@@ -33,6 +33,15 @@ L.Control.Elevation = L.Control.extend({
         this._map = map;
         var segmentIndex = this._segmentIndex = [];
         var allPaces = this._allPaces = [];
+        var sections = this._sections = [];
+        
+        this._sectionColors = [
+            'rgba(255, 99, 132, 0.3)',  // red
+            'rgba(54, 162, 235, 0.3)',  // blue
+            'rgba(255, 206, 86, 0.3)',  // yellow
+            'rgba(75, 192, 192, 0.3)',  // green
+            'rgba(153, 102, 255, 0.3)', // purple
+        ];
 
         var opts = this.options;
         var margin = opts.margins;
@@ -65,6 +74,7 @@ L.Control.Elevation = L.Control.extend({
             .y1(function (d) {
                 return y(d.altitude);
             });
+
         var container = this._container = L.DomUtil.create("div", "elevation");
 
         this._initToggle();
@@ -78,19 +88,13 @@ L.Control.Elevation = L.Control.extend({
             .append("g")
             .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
 
-        var line = d3.svg.line();
-        line = line
-            .x(function (d) {
-                return d3.mouse(svg.select("g"))[0];
-            })
-            .y(function (d) {
-                return this._height();
-            });
-
         var g = d3.select(this._container).select("svg").select("g");
 
         this._areapath = g.append("path")
             .attr("class", "area");
+
+        this._sectionsGroup = g.append("g").attr("class", "sections");
+        this._verticalLinesGroup = g.append("g").attr("class", "vertical-lines");
 
         var background = this._background = g.append("rect")
             .attr("width", this._width())
@@ -99,22 +103,175 @@ L.Control.Elevation = L.Control.extend({
             .style("stroke", "none")
             .style("pointer-events", "all");
 
+        background.on("click", (event) => {
+            if (true) {
+                this._createSection(d3.mouse(g.node()));
+            }
+        });
+
+        this._createSection = function(point) {
+            const xVal = this._x.invert(point[0]);
+            const yVal = this._y.invert(point[1]);
+            
+            this._sections.push({
+                x: point[0],
+                y: point[1],
+                dist: xVal,
+                altitude: yVal
+            });
+
+            this._sections.sort((a, b) => a.x - b.x);
+            this._updateSections();
+        };
+
+        this._updateSections = function() {
+            this._sectionsGroup.selectAll("*").remove();
+            this._verticalLinesGroup.selectAll("*").remove();
+            
+            this._verticalLinesGroup.selectAll(".vertical-line")
+                .data(this._sections)
+                .enter()
+                .append("line")
+                .attr("class", "vertical-line")
+                .attr("x1", d => d.x)
+                .attr("x2", d => d.x)
+                .attr("y1", 0)
+                .attr("y2", this._height())
+                .style("stroke", "#000")
+                .style("stroke-width", 2);
+
+            // Only create shaded sections if user has created sections
+            if (this._sections.length > 0) {
+                let fullSections = [
+                    {
+                        x: 0,
+                        y: 0,
+                        dist: this._x.invert(0),
+                        altitude: this._y.invert(0)
+                    },
+                    ...this._sections,
+                    {
+                        x: this._width(),
+                        y: 0,
+                        dist: this._x.invert(this._width()),
+                        altitude: this._y.invert(0)
+                    }
+                ];
+
+                for (let i = 0; i < fullSections.length - 1; i++) {
+                    const colorIndex = i % this._sectionColors.length;
+                    
+                    this._sectionsGroup.append("rect")
+                        .attr("x", fullSections[i].x)
+                        .attr("y", 0)
+                        .attr("width", fullSections[i + 1].x - fullSections[i].x)
+                        .attr("height", this._height())
+                        .style("fill", this._sectionColors[colorIndex])
+                        .style("pointer-events", "none");
+                }
+            }
+
+            this._verticalLinesGroup.selectAll(".section-label")
+                .data(this._sections.length > 0 ? 
+                    [{ x: 0, index: 0 }].concat(this._sections.map((d, i) => ({ x: d.x, index: i + 1 }))) : 
+                    [])
+                .enter()
+                .append("text")
+                .attr("class", "section-label")
+                .attr("x", d => d.x + 5)
+                .attr("y", 15)
+                .text(d => `Segment ${d.index + 1}`)
+                .style("font-size", "12px")
+                .style("fill", "#000");
+        };
+
         if (L.Browser.touch) {
-
-            background.on("touchmove.drag", this._dragHandler.bind(this)).
-                on("touchstart.drag", this._dragStartHandler.bind(this)).
-                on("touchstart.focus", this._mousemoveHandler.bind(this));
+            background.on("touchmove.drag", this._dragHandler.bind(this))
+                .on("touchstart.drag", this._dragStartHandler.bind(this))
+                .on("touchstart.focus", this._mousemoveHandler.bind(this));
             L.DomEvent.on(this._container, 'touchend', this._dragEndHandler, this);
-
         } else {
-
-            background.on("mousemove.focus", this._mousemoveHandler.bind(this)).
-                on("mouseout.focus", this._mouseoutHandler.bind(this)).
-                on("mousedown.drag", this._dragStartHandler.bind(this)).
-                on("mousemove.drag", this._dragHandler.bind(this));
+            background.on("mousemove.focus", this._mousemoveHandler.bind(this))
+                .on("mouseout.focus", this._mouseoutHandler.bind(this))
+                .on("mousedown.drag", this._dragStartHandler.bind(this))
+                .on("mousemove.drag", this._dragHandler.bind(this));
             L.DomEvent.on(this._container, 'mouseup', this._dragEndHandler, this);
-
         }
+
+        const controlContainer = L.DomUtil.create('div', 'control-container', container);
+        controlContainer.style.backgroundColor = 'white';
+        controlContainer.style.padding = '2px 5px';
+        controlContainer.style.margin = 'auto';
+        controlContainer.style.width = '100%';
+        controlContainer.style.display = 'flex';
+        controlContainer.style.justifyContent = 'center';
+        controlContainer.style.alignItems = 'center';
+        controlContainer.style.gap = '20px';
+
+        // Checkbox for Pace Overlay
+        const paceDiv = L.DomUtil.create('div', '', controlContainer);
+        paceDiv.style.display = 'flex'; 
+        paceDiv.style.alignItems = 'center';
+        const paceCheckbox = L.DomUtil.create('input', '', paceDiv);
+        paceCheckbox.type = 'checkbox';
+        paceCheckbox.id = 'paceCheckbox';
+        const paceLabel = L.DomUtil.create('label', '', paceDiv);
+        paceLabel.htmlFor = 'paceCheckbox';
+        paceLabel.innerText = 'Show Pace Overlay';
+        paceLabel.style.marginLeft = '5px';
+
+        // Checkbox for Move Segments
+        const moveDiv = L.DomUtil.create('div', '', controlContainer);
+        moveDiv.style.display = 'flex'; 
+        moveDiv.style.alignItems = 'center';
+        const moveSectionsCheckbox = L.DomUtil.create('input', '', moveDiv);
+        moveSectionsCheckbox.type = 'checkbox';
+        moveSectionsCheckbox.id = 'moveSectionsCheckbox';
+        const moveSectionsLabel = L.DomUtil.create('label', '', moveDiv);
+        moveSectionsLabel.htmlFor = 'moveSectionsCheckbox';
+        moveSectionsLabel.innerText = 'Move Segments';
+        moveSectionsLabel.style.marginLeft = '5px';
+
+        // Clear Segments Button
+        const clearButton = L.DomUtil.create('button', '', controlContainer);
+        clearButton.innerHTML = 'Clear Segments';
+        clearButton.onclick = () => {
+            this._sections = [];
+            this._updateSections();
+        };
+
+        // Print Segments Button
+        const printSegmentsButton = L.DomUtil.create('button', '', controlContainer);
+        printSegmentsButton.innerHTML = 'Submit New Segments';
+        printSegmentsButton.onclick = () => {
+            const allPoints = [
+                { dist: 0 },
+                ...this._sections,
+                { dist: this._x.invert(this._width()) }
+            ];
+            
+            // TODO send this to backend
+            for (let i = 0; i < allPoints.length - 1; i++) {
+                const start = allPoints[i].dist;
+                const end = allPoints[i + 1].dist;
+                console.log(`Segment ${i + 1}: ${start.toFixed(3)} to ${end.toFixed(3)}`);
+            }
+        };
+
+        // Add event listeners for checkboxes
+        paceCheckbox.addEventListener('change', () => {
+            if (paceCheckbox.checked) {
+                this._showPaceMarkers();
+            } else {
+                this._hidePaceMarkers();
+            }
+        });
+
+        moveSectionsCheckbox.addEventListener('change', () => {
+            this._moveSectionsMode = moveSectionsCheckbox.checked;
+        });
+
+        L.DomEvent.disableClickPropagation(container); // Prevents dragging of underlying map
 
         this._xaxisgraphicnode = g.append("g");
         this._yaxisgraphicnode = g.append("g");
@@ -122,33 +279,65 @@ L.Control.Elevation = L.Control.extend({
         this._appendXaxis(this._xaxisgraphicnode);
         this._appendYaxis(this._yaxisgraphicnode);
 
-        // Create the checkbox container with a white background
-        const checkboxContainer = L.DomUtil.create('div', 'checkbox-container', container);
-        checkboxContainer.style.backgroundColor = 'white'; // Set white background
-        checkboxContainer.style.padding = '2px 5px';
-        checkboxContainer.style.textAlign = 'center';
-        checkboxContainer.style.margin = 'auto';
-        checkboxContainer.style.width = '25%';
+        if (this._data) {
+            this._applyData();
+        }
+        
+        this._moveSectionsMode = false;
+        this._draggedSection = null;
 
-        // Add checkbox
-        const checkbox = L.DomUtil.create('input', '', checkboxContainer);
-        checkbox.type = 'checkbox';
-        checkbox.id = 'paceCheckbox';
-        checkbox.checked = false;
-
-        // Add label for checkbox
-        const label = L.DomUtil.create('label', '', checkboxContainer);
-        label.htmlFor = 'paceCheckbox';
-        label.innerText = 'Show Pace Overlay';
-
-        L.DomEvent.disableClickPropagation(container);
-
-        checkbox.addEventListener('change', () => {
-            if (checkbox.checked) {
-                this._showPaceMarkers();
-            } else {
-                this._hidePaceMarkers();
+        background.on("click", (event) => {
+            if (!this._moveSectionsMode) {
+                this._createSection(d3.mouse(g.node()));
             }
+        });
+
+        background.on("mousedown", (event) => {
+            if (this._moveSectionsMode) {
+                const mouseCoords = d3.mouse(g.node());
+                const nearestSection = this._sections.find(section => 
+                    Math.abs(section.x - mouseCoords[0]) < 10
+                );
+                
+                if (nearestSection) {
+                    this._draggedSection = nearestSection;
+                }
+            }
+        });
+        
+        // Shift click deletes line
+        background.on("click", (event) => {
+            if (d3.event.shiftKey) {
+                const mouseCoords = d3.mouse(g.node());
+                
+                const nearestSectionIndex = this._sections.findIndex(section => 
+                    Math.abs(section.x - mouseCoords[0]) < 10
+                );
+                
+                if (nearestSectionIndex !== -1) {
+                    this._sections.splice(nearestSectionIndex, 1);
+                    this._updateSections();
+                }
+            } else if (!this._moveSectionsMode) {
+                this._createSection(d3.mouse(g.node()));
+            }
+        });
+
+        background.on("mousemove", (event) => {
+            if (this._moveSectionsMode && this._draggedSection) {
+                const mouseCoords = d3.mouse(g.node());
+                
+                this._draggedSection.x = mouseCoords[0];
+                this._draggedSection.dist = this._x.invert(mouseCoords[0]);
+                
+                this._sections.sort((a, b) => a.x - b.x);
+                
+                this._updateSections();
+            }
+        });
+
+        background.on("mouseup", (event) => {
+            this._draggedSection = null;
         });
 
         var focusG = this._focusG = g.append("g");
@@ -178,6 +367,7 @@ L.Control.Elevation = L.Control.extend({
 
         return container;
     },
+
 
     _dragHandler: function () {
 
@@ -484,6 +674,7 @@ L.Control.Elevation = L.Control.extend({
         if (!this._data || this._data.length === 0) {
             return;
         }
+        console.log("OUIOUI")
         var coords = d3.mouse(this._background.node());
         var opts = this.options;
         var index = this._findItemForX(coords[0]);

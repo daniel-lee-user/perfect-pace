@@ -48,6 +48,7 @@ def upload_file():
     try:
         # Run the Python script with the flags
         print(file_path)
+        file_path = os.path.realpath(file_path)
         os.chdir("src/")
         result = subprocess.run(
             ['python', 'main.py', '-f', file_path, '-t', time, '-p', paces, '-m', algorithm] + ([is_loop] if is_loop else []),

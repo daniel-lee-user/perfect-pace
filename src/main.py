@@ -1,7 +1,7 @@
 import argparse
 import os
 import race_course
-from pacing_plan import PacingPlanBFAbsolute, PacingPlanBFSquare, PacingPlanAvgPacePerMile, PacingPlanAvgPace, PacingPlanSegmenting
+from pacing_plan import PacingPlan, PacingPlanBFAbsolute, PacingPlanBFSquare, PacingPlanAvgPacePerMile, PacingPlanAvgPace, PacingPlanSegmenting
 from pacing_plan_lp import PacingPlanLPAbsolute, PacingPlanLPSquare
 
 PACING_PLAN_METHODS = {
@@ -101,6 +101,7 @@ def main():
         print(f'\n{str(course)}')
 
     course_directory = os.path.dirname(file_path)+'/results/'+course_name +'/'
+    print(course_directory)
     if not os.path.exists(course_directory):
         os.makedirs(course_directory)
 
@@ -119,7 +120,7 @@ def main():
     current_m_paces = args.paces
     method = args.method
     pacing_plan_class = PACING_PLAN_METHODS[method]
-    plan = pacing_plan_class(course, target_time, current_m_paces)
+    plan: PacingPlan = pacing_plan_class(course, target_time, current_m_paces)
 
     pacing_plan_directory = os.path.join(course_directory, method)
     if not os.path.exists(pacing_plan_directory):
@@ -153,11 +154,10 @@ def main():
             'plan_miles': os.path.join(pacing_plan_directory, f'{plan_identifier}_miles.json')
         }
 
-        plan.gen_geojson(file_path['geojson'], use_loop)
+        plan.gen_geojson_full(file_path['geojson'], use_loop)
         plan.gen_pace_chart(file_path['plot'], incl_opt_paces=True, incl_true_paces=True)
-        #plan.gen_plan_per_mile(file_path["plan_miles"], use_csv=False)
-        plan.gen_plan_per_mile_json(file_path["plan_miles"])
-        plan.gen_abbrev_plan_json(file_path['plan_segments'])
+        plan.gen_geojson_per_mile(file_path["plan_miles"])
+        plan.gen_geojson_abbrev(file_path['plan_segments'])
         #with open(file_path['plan_segments'], 'w') as f:
         #    f.write(plan.gen_abbrev_plan())
 

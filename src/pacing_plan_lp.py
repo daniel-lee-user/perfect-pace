@@ -1,9 +1,9 @@
 import numpy as np
 import cvxpy as cp
 from abc import ABC, abstractmethod
-from pacing_plan import PacingPlan
+from pacing_plan import PacingPlanStatic
 
-class PacingPlanLP(PacingPlan, ABC):
+class PacingPlanLP(PacingPlanStatic, ABC):
     def __init__(self, race_course, target_time, total_paces):
         super().__init__(race_course, target_time, total_paces)
         self.paces = None
@@ -72,7 +72,7 @@ class PacingPlanLPAbsolute(PacingPlanLP):
         constraints = [
             self.changes >= 0,
             self.changes <= 1,
-            cp.sum(self.changes) == self.current_m_paces - 1,
+            cp.sum(self.changes) == self.total_paces - 1,
             self.absolutes >= self.paces - (self.optimal_paces),
             self.absolutes >= (self.optimal_paces) - self.paces
         ]
@@ -97,7 +97,7 @@ class PacingPlanLPSquare(PacingPlanLP):
         constraints = [
             self.changes >= 0,
             self.changes <= 1,
-            cp.sum(self.changes) == self.current_m_paces - 1,
+            cp.sum(self.changes) == self.total_paces - 1,
         ]
         constraints += [self.M*self.changes[i] >= self.paces[i+1] - self.paces[i] for i in range(n_segments-1)]
         constraints += [self.M*self.changes[i] >= self.paces[i] - self.paces[i+1] for i in range(n_segments-1)]

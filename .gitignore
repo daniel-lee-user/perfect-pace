@@ -9,3 +9,6 @@ notebooks/.ipynb_checkpoints
 .venv/
 local_testing/
 src/.DS_Store
+
+data/results
+data/test-results

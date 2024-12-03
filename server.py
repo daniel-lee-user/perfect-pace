@@ -6,16 +6,11 @@ import os
 import tempfile
 import zipfile
 from flask_cors import CORS
-from flask_limiter import Limiter
-from flask_limiter.util import get_remote_address
 
 app = Flask(__name__)
 CORS(app, origins="https://daniel-lee-user.github.io", methods=["GET", "POST", "DELETE", "OPTIONS"], allow_headers=["Content-Type", "Authorization"])
 
-limiter = Limiter(get_remote_address, app=app, default_limits=["200 per day", "50 per hour"])
-
 @app.route('/upload', methods=['POST'])
-@limiter.limit("10 per minute")
 def upload_file():
     print("RECEIVED REQUEST")
     file = request.files.get('file')
@@ -92,7 +87,6 @@ def upload_file():
     return send_file(zip_file_path, as_attachment=True, mimetype='application/zip')
 
 @app.route('/delete', methods=['DELETE'])
-@limiter.limit("10 per minute")
 def delete_files():
     try:
         # Extract data from the request (paces, time, algorithm, file)
@@ -140,7 +134,6 @@ def delete_files():
         print(f"Error: {e}")
         return jsonify({'error': str(e)}), 500
 
-@limiter.limit("10 per minute")
 @app.route("/")
 def health():
     return "Healthy"

@@ -148,10 +148,9 @@ def delete_files():
 @app.route("/")
 @limiter.limit("10 per minute")
 def health():
-    #logger.info("TESTING LOG")
     return "Healthy"
 
 if __name__ == '__main__':
     from waitress import serve
-    serve(app, host="0.0.0.0", port=5000, threads=8, asyncore_use_poll=True, url_scheme="http", channel_timeout=300)
+    serve(app, host="0.0.0.0", port=5000, threads=8, channel_timeout=400)
     #app.run(host="0.0.0.0", port=5000)

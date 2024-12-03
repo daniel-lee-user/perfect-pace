@@ -57,7 +57,7 @@ document.getElementById('submitBtn').addEventListener('click', async function (e
         const response = await fetch(url, {
             method: "POST",
             body: formData,
-            signal: AbortSignal.timeout(300000) // timeout for 5 minutes...
+            signal: AbortSignal.timeout(400000) // timeout for 400 seconds
         })
 
         console.log("FINISHED UPLOAD");

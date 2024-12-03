@@ -53,11 +53,13 @@ document.getElementById('submitBtn').addEventListener('click', async function (e
     try {
         document.getElementById('loadingScreen').style.display = 'block';
 
-        const url = 'https://perfect-pace-container.0pr6sav0peebr.us-east-2.cs.amazonlightsail.com/upload';
+        const url = 'http://127.0.0.1:5000/upload';
         const response = await fetch(url, {
             method: "POST",
             body: formData,
         })
+
+        console.log("FINISHED UPLOAD");
 
         const blob = await response.blob();
         const zip = await JSZip.loadAsync(blob);
@@ -96,12 +98,12 @@ document.getElementById('submitBtn').addEventListener('click', async function (e
         window.location.reload();
     }
 
-    function deleteFile(paces, time, algorithm, filename) {
+    async function deleteFile(paces, time, algorithm, filename) {
         // Construct the request URL (assuming the route for deletion is '/delete')
-        const url = 'https://perfect-pace-container.0pr6sav0peebr.us-east-2.cs.amazonlightsail.com/delete';
+        const url = 'http://127.0.0.1:5000/delete';
 
         // Send a DELETE request with JSON payload
-        fetch(url, {
+        await fetch(url, {
             method: 'DELETE', // Specify DELETE method
             headers: {
                 'Content-Type': 'application/json', // Set content type to JSON
@@ -117,8 +119,6 @@ document.getElementById('submitBtn').addEventListener('click', async function (e
             .then(data => {
                 if (data.success) {
                     console.log('File deleted successfully');
-                } else {
-                    console.error('Error deleting file:', data.error);
                 }
             })
             .catch(error => {

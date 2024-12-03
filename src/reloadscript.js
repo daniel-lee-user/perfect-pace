@@ -92,8 +92,8 @@ document.getElementById('submitBtn').addEventListener('click', async function (e
         sessionStorage.setItem('filename', filename);
         document.getElementById('loadingScreen').style.display = 'none';
         fileInput.value = '';
-        // should redirect to map.html
-        window.location.href = 'map.html';
+        // should just reload the page
+        window.location.reload();
     }
 
     function deleteFile(paces, time, algorithm, filename) {

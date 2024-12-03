@@ -31,8 +31,7 @@ document.getElementById('submitBtn').addEventListener('click', async function (e
         const url = 'https://perfect-pace-container.0pr6sav0peebr.us-east-2.cs.amazonlightsail.com/upload';
         const response = await fetch(url, {
             method: "POST",
-            body: formData,
-            signal: AbortSignal.timeout(60000)
+            body: formData
         });
 
         const blob = await response.blob();
@@ -71,8 +70,7 @@ function deleteFile(paces, time, algorithm, filename) {
             "time": time,           // Time value
             "alg": algorithm, // Algorithm type (e.g., 'DP' or 'LP')
             "filename": filename    // Filename to delete
-        }),
-        signal: AbortSignal.timeout(60000)
+        })
     })
         .then(response => response.json()) // Parse the response as JSON
         .then(data => {

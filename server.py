@@ -142,6 +142,7 @@ def delete_files():
 
 @app.route("/")
 def health():
+    logger.info("TESTING LOG")
     return "Healthy"
 
 if __name__ == '__main__':

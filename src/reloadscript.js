@@ -95,7 +95,7 @@ document.getElementById('submitBtn').addEventListener('click', async function (e
         document.getElementById('loadingScreen').style.display = 'none';
         fileInput.value = '';
         // should just reload the page
-        window.location.reload();
+        //window.location.reload();
     }
 
     async function deleteFile(paces, time, algorithm, filename) {

@@ -57,6 +57,7 @@ document.getElementById('submitBtn').addEventListener('click', async function (e
         const response = await fetch(url, {
             method: "POST",
             body: formData,
+            signal: AbortSignal.timeout(300000) // timeout for 5 minutes...
         })
 
         console.log("FINISHED UPLOAD");
@@ -95,7 +96,7 @@ document.getElementById('submitBtn').addEventListener('click', async function (e
         document.getElementById('loadingScreen').style.display = 'none';
         fileInput.value = '';
         // should just reload the page
-        //window.location.reload();
+        window.location.reload();
     }
 
     async function deleteFile(paces, time, algorithm, filename) {

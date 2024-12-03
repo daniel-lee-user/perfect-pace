@@ -7,14 +7,18 @@ import tempfile
 import zipfile
 from flask_cors import CORS
 import sys
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 import logging
 
 app = Flask(__name__)
 CORS(app, origins="https://daniel-lee-user.github.io", methods=["GET", "POST", "DELETE", "OPTIONS"], allow_headers=["Content-Type", "Authorization"])
 logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
 logger = logging.getLogger('waitress')
+limiter = Limiter(get_remote_address, app=app, default_limits=["200 per day", "50 per hour"])
 
 @app.route('/upload', methods=['POST'])
+@limiter.limit("10 per minute")
 def upload_file():
     logger.info("RECEIVED REQUEST")
     file = request.files.get('file')
@@ -92,6 +96,7 @@ def upload_file():
     return send_file(zip_file_path, as_attachment=True, mimetype='application/zip')
 
 @app.route('/delete', methods=['DELETE'])
+@limiter.limit("10 per minute")
 def delete_files():
     try:
         # Extract data from the request (paces, time, algorithm, file)
@@ -141,11 +146,12 @@ def delete_files():
         return jsonify({'error': str(e)}), 500
 
 @app.route("/")
+@limiter.limit("10 per minute")
 def health():
-    logger.info("TESTING LOG")
+    #logger.info("TESTING LOG")
     return "Healthy"
 
 if __name__ == '__main__':
     from waitress import serve
-    serve(app, host="0.0.0.0", port=5000)
+    serve(app, host="0.0.0.0", port=5000, threads=8, asyncore_use_poll=True, url_scheme="http", channel_timeout=300)
     #app.run(host="0.0.0.0", port=5000)

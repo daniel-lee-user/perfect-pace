@@ -9,6 +9,7 @@ window.addEventListener('load', () => {
     const geoData = sessionStorage.getItem('geoData');
     if (geoData) {
         const geojson = JSON.parse(geoData);
+        console.log(geoData);
         geojson.features.forEach((feature, index) => {
             let coordinates = feature.geometry.coordinates;
             let startPoint = coordinates[0];
@@ -36,7 +37,7 @@ window.addEventListener('load', () => {
     const mileData = sessionStorage.getItem('miles');
     console.log(mileData);
     console.log(segmentData);
-    if(segmentData) {
+    if (segmentData) {
         parseSegmentData(segmentData);
     }
 
@@ -84,19 +85,19 @@ window.addEventListener('load', () => {
     function parseMileIndexData(data) {
         data.segments.forEach(segment => {
             const row = document.createElement('tr');
-            
+
             const mileIndex = segment.mile_index;
             const elapsedTime = formatTime(segment.elapsed_time);
             const pacePerMile = segment.pace_per_mile;
             const timePerMile = formatTime(segment.time_per_mile);
-    
+
             // Append row to table
             [mileIndex, `${elapsedTime}`, `${pacePerMile}/mile`, `${timePerMile}`].forEach(value => {
                 const cell = document.createElement('td');
                 cell.textContent = value;
                 row.appendChild(cell);
             });
-            
+
             document.getElementById('data-table').appendChild(row);
         });
     }
@@ -106,9 +107,9 @@ window.addEventListener('load', () => {
         const hours = Math.floor(totalSeconds / 3600);
         const minutesPart = Math.floor((totalSeconds % 3600) / 60);
         const seconds = totalSeconds % 60;
-    
+
         return `${String(hours).padStart(2, '0')}:${String(minutesPart).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-    }    
+    }
     // Convert pace from minutes/mile to minutes/km
     function convertPaceToKmPerMinute(paceMinutes, paceMiles) {
         const [mins, secs] = paceMinutes.split(':').map(Number);
@@ -122,7 +123,7 @@ window.addEventListener('load', () => {
         const headers = segmentType === 'segments'
             ? ["Segment", "Start Distance", "Pace", "Segment Length"]
             : ["Mile", "Elapsed Time", "Avg Pace", "Time/Mile"];
-    
+
         // Update table headers
         document.getElementById('data-table').innerHTML = `
             <tr>
@@ -166,7 +167,7 @@ window.addEventListener('load', () => {
             }).addTo(map);
             map.fitBounds(geoJsonLayer.getBounds());
         }
-        if(segmentData || mileData) {
+        if (segmentData || mileData) {
             if (document.getElementById('segment-select').value === 'segments') {
                 parseSegmentData(segmentData);
             } else {
@@ -192,9 +193,9 @@ window.addEventListener('load', () => {
                 <th>${headers[3]}</th>
             </tr>
         `;
-    
+
         // Parse and display data based on selected type
-    
+
         if (segmentType === 'segments') {
             parseSegmentData(segmentData);
         } else {

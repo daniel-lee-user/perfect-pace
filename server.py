@@ -12,7 +12,7 @@ import sys
 import logging
 
 app = Flask(__name__)
-CORS(app, origins="https://daniel-lee-user.github.io", methods=["GET", "POST", "DELETE", "OPTIONS"], allow_headers=["Content-Type", "Authorization"])
+CORS(app, origins=["https://daniel-lee-user.github.io", "http://127.0.0.1:5500"], methods=["GET", "POST", "DELETE", "OPTIONS"], allow_headers=["Content-Type", "Authorization"])
 logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
 logger = logging.getLogger('waitress')
 #limiter = Limiter(get_remote_address, app=app, default_limits=["200 per day", "50 per hour"])

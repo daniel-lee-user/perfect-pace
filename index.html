@@ -1,61 +1,96 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pacing Plan Generator</title>
-    <link rel="stylesheet" href="src/styles.css">
+    <title>GPX Map</title>
+    <!-- ensure integrity of imported libraries by using SHA-256 hash-->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="anonymous" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.elevation@0.0.3/dist/Leaflet.Elevation-0.0.2.css" integrity="sha384-jONMdyFYBZ+QzYQp+gGJSDkmD6Yi1ca1xk2/7/KRJXNF5JXQRBs9FPeY3ovbbxXF" crossorigin="anonymous">
+    <link rel="stylesheet" href="src/styles2.css" />
+    <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js" integrity="sha384-+mbV2IY1Zk/X1p/nWllGySJSUN8uMs+gUAN10Or95UBH0fpj6GfKgPmgC5EXieXG" crossorigin="anonymous"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin="anonymous"></script>
+    <script src="https://d3js.org/d3.v3.min.js" integrity="sha384-N8EP0Yml0jN7e0DcXlZ6rt+iqKU9Ck6f1ZQ+j2puxatnBq4k9E8Q6vqBcY34LNbn" crossorigin="anonymous"></script>
+    <script src="https://api.tiles.mapbox.com/mapbox.js/plugins/leaflet-omnivore/v0.3.1/leaflet-omnivore.min.js" integrity="sha384-qhsiITse/qx9/hyk3zeRbeTDEY+UNlaJoJyxV2JWlaLiXMjwZ1BP7nmri1/EyzLV" crossorigin="anonymous"></script>
+    <script src="src/elevationgraph2.js"></script>
+    <script src="src/mapscript.js" defer></script>
+    <script src="src/reloadscript.js" defer></script>
 </head>
+
 <body>
-
-    <!-- Title for Pacing Plan Generator -->
-    <h1>Pacing Plan Generator</h1>
-
     <div class="container">
-        <h1>Upload a GPX File</h1>
-
-        <!-- Text input box asking for number of pace changes -->
-        <div id="paceChanges-container">
-            <label for="paceChanges">How many pace changes do you want?</label>
-            <input type="number" id="paceChanges" name="paceChanges" min="1" placeholder="Enter number of pace changes">
-            <label for="time">How long should the course take to complete (in minutes)?</label>
-            <input type="number" id="time" name="time" min="1" placeholder="Enter number of minutes">
+        <div id="table-container">
+            <h3>
+                <span id="table-label">Segment Data</span>
+                <select id="segment-select" class="segment-select">
+                    <option value="segments">Segments</option>
+                    <option value="miles">Miles</option>
+                </select>
+                <select id="unit-select" class="unit-select">
+                    <option value="imperial">Imperial</option>
+                    <option value="metric">Metric</option>
+                </select>
+            </h3>
+            <table id="data-table" border="1">
+                <tr>
+                    <th>Segment</th>
+                    <th>Distance (mi)</th>
+                    <th>Pace (/mile)</th>
+                    <th>Segment Length (mi)</th>
+                </tr>
+            </table>
         </div>
 
-        <!-- GPX File Upload -->
-        <input type="file" id="fileInput" accept=".gpx" />
-        <label for="fileInput">Choose a GPX file</label>
-
-        <!-- Checkbox for loop course -->
-        <div class="checkbox-container">
-            <label for="loops">Is this course a loop?</label>
-            <input type="checkbox" id="loops" name="loops" value="loops">
-            <label for="plan-type">Plan Type:</label>
-            <select id="plan-type" name="plan-type">
-                <option value="BFA">BFA</option>
-                <option value="BFS">BFS</option>
-                <option value="LPA">LPA</option>
-                <option value="LPS">LPS</option>
-                <option value="APPM">APPM</option>
-                <option value="AP">AP</option>
-                <option value="SEG">SEG</option>
-            </select>            
-        </div>        
-
-        <div id="errorMessage" class="error"></div>
-
-        <!-- Add this loading screen -->
+        <!-- Placeholder box over the map -->
+        <div id="paces-change">
+            <h3>Pace Changes</h3>
+            <form>
+                <div class="form-group">
+                    <label for="paceChanges">Pace changes:
+                    <input type="number" id="paceChanges" name="paceChanges" min="1">
+                </label>
+                </div>
+                <div class="form-group">
+                    <label for="time">Minutes:
+                    <input type="number" id="time" name="time" min="1">
+                </label>
+                </div>
+                <div class="form-group">
+                    <label for="loops">Is this course a loop?
+                    <input type="checkbox" id="loops" name="loops" value="loops">
+                    </label>
+                </div>
+                <div class="form-group">
+                    <label for="plan-type">Plan Type:
+                        <select id="plan-type" name="plan-type">
+                            <option value="BFA">BFA</option>
+                            <option value="BFS">BFS</option>
+                            <option value="LPA">LPA</option>
+                            <option value="LPS">LPS</option>
+                            <option value="APPM">APPM</option>
+                            <option value="AP">AP</option>
+                            <option value="SEG">SEG</option>
+                        </select>            
+                    </label>
+                </div>
+                <div class="form-group">
+                    <label for="gpxFile">Choose GPX file:
+                        <input type="file" id="gpxFile" name="gpxFile" accept=".gpx">
+                    </label>
+                </div> 
+            <div class="form-group">
+                <button type="submit" onsubmit="return false" class="submit-button" id="submitBtn">Submit</button>
+            </div>
+            </form>
+        </div>
+        
         <div id="loadingScreen">
             <h1>Loading...</h1>
         </div>
 
-        <footer>
-            &copy; 2024 Perfect Pace
-        </footer>
+        <div id="map"></div>
     </div>
-
-    <script src="https://unpkg.com/@mapbox/togeojson@0.16.0/togeojson.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-    <script src="src/script.js"></script>
 </body>
+
 </html>

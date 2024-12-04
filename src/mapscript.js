@@ -1,6 +1,6 @@
 // Map Initialization
 window.addEventListener('load', () => {
-    var map = L.map('map').setView([51.505, -0.09], 13);
+    var map = L.map('map').setView([42.446, -76.4808], 13);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: 'Map data &copy; <a href="http://www.osm.org">OpenStreetMap</a>'
     }).addTo(map);
@@ -28,8 +28,6 @@ window.addEventListener('load', () => {
             }
         }).addTo(map);
         map.fitBounds(geoJsonLayer.getBounds());
-    } else {
-        alert('No GPX data found!');
     }
 
     // Fetch and parse text data from segments.txt
@@ -38,7 +36,9 @@ window.addEventListener('load', () => {
     const mileData = sessionStorage.getItem('miles');
     console.log(mileData);
     console.log(segmentData);
-    parseSegmentData(segmentData);
+    if(segmentData) {
+        parseSegmentData(segmentData);
+    }
 
     // Parse and display JSON data
     function parseSegmentData(jsonData) {
@@ -166,11 +166,13 @@ window.addEventListener('load', () => {
             }).addTo(map);
             map.fitBounds(geoJsonLayer.getBounds());
         }
-        if (document.getElementById('segment-select').value === 'segments') {
-            parseSegmentData(segmentData);
-        } else {
-            const data = JSON.parse(mileData);
-            parseMileIndexData(data);
+        if(segmentData || mileData) {
+            if (document.getElementById('segment-select').value === 'segments') {
+                parseSegmentData(segmentData);
+            } else {
+                const data = JSON.parse(mileData);
+                parseMileIndexData(data);
+            }
         }
     });
     document.getElementById('segment-select').addEventListener('change', () => {
@@ -199,5 +201,21 @@ window.addEventListener('load', () => {
             const data = JSON.parse(mileData);
             parseMileIndexData(data);
         }
-    });    
+    });
+    document.getElementById('gpxFile').addEventListener('change', async function (event) {
+        const fileInput = document.getElementById('gpxFile');
+        if (!fileInput.files.length) {
+            fileInput.value = '';
+            alert("Please select a valid GPX file.");
+            return;
+        }
+        // Check if the file extension is .gpx
+        const fileExtension = fileInput.files[0].name.split('.').pop().toLowerCase();
+        if (fileExtension !== 'gpx') {
+            fileInput.value = '';
+            alert("Please select a valid GPX file.");
+            return;
+        }
+        window.gpxFile = fileInput;
+    });
 });

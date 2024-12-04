@@ -674,6 +674,7 @@ L.Control.Elevation = L.Control.extend({
         if (!this._data || this._data.length === 0) {
             return;
         }
+        console.log("OUIOUI")
         var coords = d3.mouse(this._background.node());
         var opts = this.options;
         var index = this._findItemForX(coords[0]);

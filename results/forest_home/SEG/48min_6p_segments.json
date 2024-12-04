@@ -1,0 +1,25 @@
+{
+    "course_name": "forest_home",
+    "target_time": 48,
+    "segments": [
+        {
+            "segment_num": 0,
+            "start_distance": "0.00",
+            "pace": "8:33",
+            "distance": "2.97"
+        },
+        {
+            "segment_num": 1,
+            "start_distance": "2.97",
+            "pace": "8:05",
+            "distance": "1.04"
+        },
+        {
+            "segment_num": 2,
+            "start_distance": "4.02",
+            "pace": "8:25",
+            "distance": "1.68"
+        }
+    ],
+    "total_time": 48
+}

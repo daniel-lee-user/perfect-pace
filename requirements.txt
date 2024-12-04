@@ -7,8 +7,6 @@ cycler==0.12.1
 ecos==2.0.14
 Flask==3.0.3
 Flask-Cors==5.0.0
-Flask-Limiter==3.0.0
-Waitress==2.1.2
 fonttools==4.54.1
 gpxpy==1.6.2
 gurobipy==11.0.3

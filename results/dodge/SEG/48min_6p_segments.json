@@ -1,0 +1,37 @@
+{
+    "course_name": "dodge",
+    "target_time": 48,
+    "segments": [
+        {
+            "segment_num": 0,
+            "start_distance": "0.00",
+            "pace": "7:12",
+            "distance": "1.29"
+        },
+        {
+            "segment_num": 1,
+            "start_distance": "1.29",
+            "pace": "7:21",
+            "distance": "2.51"
+        },
+        {
+            "segment_num": 2,
+            "start_distance": "3.80",
+            "pace": "6:47",
+            "distance": "1.35"
+        },
+        {
+            "segment_num": 3,
+            "start_distance": "5.15",
+            "pace": "6:35",
+            "distance": "0.50"
+        },
+        {
+            "segment_num": 4,
+            "start_distance": "5.66",
+            "pace": "7:07",
+            "distance": "1.08"
+        }
+    ],
+    "total_time": 48
+}

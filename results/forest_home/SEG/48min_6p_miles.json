@@ -1,0 +1,49 @@
+{
+    "course_name": "forest_home",
+    "target_time": 48,
+    "segments": [
+        {
+            "mile_index": 0,
+            "pace_per_mile": "8:33",
+            "time_per_mile": 8.557622137025009,
+            "elapsed_time": 8.557622137025009,
+            "distance": 1.0
+        },
+        {
+            "mile_index": 1,
+            "pace_per_mile": "8:33",
+            "time_per_mile": 8.557622137025003,
+            "elapsed_time": 17.115244274050013,
+            "distance": 1.0
+        },
+        {
+            "mile_index": 2,
+            "pace_per_mile": "8:32",
+            "time_per_mile": 8.545751055410692,
+            "elapsed_time": 25.660995329460704,
+            "distance": 1.0
+        },
+        {
+            "mile_index": 3,
+            "pace_per_mile": "8:05",
+            "time_per_mile": 8.091854199536346,
+            "elapsed_time": 33.75284952899705,
+            "distance": 1.0
+        },
+        {
+            "mile_index": 4,
+            "pace_per_mile": "8:25",
+            "time_per_mile": 8.420345000293914,
+            "elapsed_time": 42.17319452929096,
+            "distance": 1.0
+        },
+        {
+            "mile_index": 5,
+            "pace_per_mile": "8:25",
+            "time_per_mile": 5.826805470709051,
+            "elapsed_time": 48.000000000000014,
+            "distance": 0.6915706742943843
+        }
+    ],
+    "total_time": 47.99999999999999
+}

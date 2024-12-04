@@ -2,12 +2,6 @@
 
 Repository for the perfect pace project
 
-# Website:
-
-https://daniel-lee-user.github.io/perfect-pace/
-
-# Installation instructions:
-
 To install the requirements for the UI use `npm install` within the app directory
 
 If you run the website using the VSCode live server, the save directory will be located outside of this project directory (../perfect_pace_data). The reason why the save directory is outside of the repository is because live reload will automatically refresh the server whenever changes are made, preventing you from seeing your updated pacing plan.

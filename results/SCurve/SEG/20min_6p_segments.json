@@ -1,0 +1,31 @@
+{
+    "course_name": "scurve",
+    "target_time": 20,
+    "segments": [
+        {
+            "segment_num": 0,
+            "start_distance": "0.00",
+            "pace": "8:23",
+            "distance": "0.79"
+        },
+        {
+            "segment_num": 1,
+            "start_distance": "0.79",
+            "pace": "7:39",
+            "distance": "0.50"
+        },
+        {
+            "segment_num": 2,
+            "start_distance": "1.29",
+            "pace": "7:33",
+            "distance": "0.98"
+        },
+        {
+            "segment_num": 3,
+            "start_distance": "2.27",
+            "pace": "7:55",
+            "distance": "0.27"
+        }
+    ],
+    "total_time": 20
+}

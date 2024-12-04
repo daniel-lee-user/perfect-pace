@@ -55,10 +55,9 @@ document.getElementById('fileInput').addEventListener('change', async function (
     try {
         document.getElementById('loadingScreen').style.display = 'block';
 
-        const url = 'https://perfect-pace-container.0pr6sav0peebr.us-east-2.cs.amazonlightsail.com/upload';
-        const response = await fetch(url, {
+        const response = await fetch("http://127.0.0.1:5000/upload", {
             method: "POST",
-            body: formData,
+            body: formData
         })
 
         const blob = await response.blob();
@@ -94,13 +93,12 @@ document.getElementById('fileInput').addEventListener('change', async function (
         sessionStorage.setItem('filename', filename);
         document.getElementById('loadingScreen').style.display = 'none';
         fileInput.value = '';
-        // should redirect to map.html
         window.location.href = 'map.html';
     }
 
     function deleteFile(paces, time, algorithm, filename) {
         // Construct the request URL (assuming the route for deletion is '/delete')
-        const url = 'https://perfect-pace-container.0pr6sav0peebr.us-east-2.cs.amazonlightsail.com/delete';
+        const url = 'http://127.0.0.1:5000/delete';
 
         // Send a DELETE request with JSON payload
         fetch(url, {

@@ -121,6 +121,21 @@ class AveragePacePerMilePlan(SegmentingPlan):
             segments.append(int(mile_marker)) # Ensure mile_markers are ints (not np.int64)
         return segments
 
+class AveragePacePerKilometerPlan(SegmentingPlan):
+    def __init__(self, race_course):
+        super().__init__(race_course)
+
+    def _calculate_segments(self):
+        segments = [0]
+        end_distances_km = self.race_course.end_distances * utils.Conversions.MILES_TO_KM.value
+        total_distance_km = self.race_course.total_distance * utils.Conversions.MILES_TO_KM.value
+        for i in range(1, math.ceil(total_distance_km)):
+            km_marker = np.argmin(
+                np.abs(end_distances_km - i)
+            )  # Find closest index to mile marker
+            segments.append(int(km_marker)) # Ensure mile_markers are ints (not np.int64)
+        return segments
+
 class HillDetectionPlan(SegmentingPlan):
     MIN_HILL_DISTANCE = 350*utils.Conversions.METERS_TO_MILES.value # 350 Meters in Miles
     MIN_HILL_HEIGHT = 30    # Feet

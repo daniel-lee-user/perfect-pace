@@ -7,6 +7,7 @@ import shutil
 SEGMENTING_PLAN_METHODS = {
     "AVG": AveragePacePlan,
     "APPM": AveragePacePerMilePlan,
+    "APPKM": AveragePacePerKilometerPlan,
     "HILL": HillDetectionPlan
 }
 

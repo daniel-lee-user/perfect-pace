@@ -12,6 +12,7 @@ import sys
 SEGMENTING_METHODS = {
     "AP": AveragePacePlan,
     "APPM": AveragePacePerMilePlan,
+    "APPKM": AveragePacePerKilometerPlan,
     "HILL": HillDetectionPlan
 }
 

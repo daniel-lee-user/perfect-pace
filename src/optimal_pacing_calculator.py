@@ -47,7 +47,7 @@ class OptimalPacingCalculator:
 
                 if total_length > 0:
                     # Weighted average pace for the segment [i:j]
-                    weighted_paces[i][j] = np.dot(segment_paces, segment_lengths / total_length)
+                    weighted_paces[i][j] = np.dot(segment_paces, segment_lengths / total_length).round(4)
 
         return weighted_paces
         

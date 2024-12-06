@@ -5,6 +5,8 @@ import numpy as np
 from segmenting_plan import SegmentingPlan, AveragePacePlan, AveragePacePerMilePlan, HillDetectionPlan
 from optimal_pacing_calculator import OptimalPacingCalculator
 import race_course
+import logging
+import sys
 
 # Define available segmenting methods
 SEGMENTING_METHODS = {
@@ -55,6 +57,36 @@ def process_segments(course, methods, output_dir, verbose=False):
 
     return segments
 
+def save_frontend_files(course, target_time, segments, optimal_paces, output_dir):
+    """
+    Save files needed for frontend session storage.
+    """
+    # Segment lengths
+    segment_lengths = course.segment_lengths.tolist()
+
+    # Coordinates (latitude, longitude, elevation)
+    coordinates = [
+        [lat, lon, ele] for lat, lon, ele in zip(course.lats, course.lons, course.elevations)
+    ]
+
+    # Save preset segments
+    preset_segments = segments
+
+    # Prepare data for frontend
+    frontend_data = {
+        "presetSegments": preset_segments,
+        "optimalPaces": optimal_paces,
+        "segmentLengths": segment_lengths,
+        "coordinates": coordinates,
+    }
+
+    # Save each key in separate JSON files for clarity
+    for key, value in frontend_data.items():
+        file_path = os.path.join(output_dir, f"{key}.json")
+        with open(file_path, "w") as json_file:
+            json.dump(value, json_file, indent=4)
+
+    print("Frontend files saved successfully.")
 
 def main():
     parser = init_parser()
@@ -68,7 +100,9 @@ def main():
     course_name = os.path.basename(file_path).split('.')[0]
     course = race_course.RealRaceCourse(course_name, file_path)
 
-    output_dir = os.path.join(args.output, course_name, 'segments')
+    output_dir = args.output
+    if args.output == "results":
+        output_dir = os.path.join(output_dir, course_name, 'segments')
 
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
@@ -80,27 +114,13 @@ def main():
     optimal_pace_calculator = OptimalPacingCalculator(course, target_time)
     weighted_paces = optimal_pace_calculator.calculate_weighted_paces()
 
-    # Save optimal paces to a file
-    paces_file_path = os.path.join(output_dir, "optimal_paces.json")
-    with open(paces_file_path, "w") as paces_file:
-        json.dump(weighted_paces, paces_file, indent=4)
-
-    if verbose:
-        print(f"Saved weighted paces to {paces_file_path}")
-
     # Process segmenting methods
     segments = process_segments(course, SEGMENTING_METHODS, output_dir, verbose=verbose)
 
-    # Save segments to a file
-    segments_file_path = os.path.join(output_dir, "segments.json")
-    with open(segments_file_path, "w") as segments_file:
-        json.dump(segments, segments_file, indent=4)
-
-    if verbose:
-        print(f"Saved segments to {segments_file_path}")
+    # Save frontend files
+    save_frontend_files(course, target_time, segments, weighted_paces, output_dir)
 
     print("Processing complete.")
-
 
 if __name__ == "__main__":
     main()

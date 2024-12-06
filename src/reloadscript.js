@@ -1,3 +1,5 @@
+import { updateFiles } from './updatefiles.js';
+
 document.getElementById('submitBtn').addEventListener('click', async function (event) {
     event.preventDefault(); // Prevents the form from submitting and reloading immediately
 
@@ -11,22 +13,16 @@ document.getElementById('submitBtn').addEventListener('click', async function (e
         alert("Please select a valid GPX file.");
         return;
     }
-    const paceChanges = document.getElementById('paceChanges').value;
+
     const time = document.getElementById('time').value;
-    const isLoop = document.getElementById('loops').checked;
-    const algorithm = document.getElementById('plan-type').value;
     const filename = fileInput.files[0].name;
+
     console.log("UPLOAD");
+
     // Check if required fields are filled
     if (!fileInput.files.length) {
         fileInput.value = '';
         alert("Please select a valid GPX file.");
-        return;
-    }
-
-    if (!paceChanges || paceChanges <= 0) {
-        fileInput.value = '';
-        alert("Please enter a valid number of pace changes.");
         return;
     }
 
@@ -37,10 +33,7 @@ document.getElementById('submitBtn').addEventListener('click', async function (e
 
     const formData = new FormData();
     formData.append('file', fileInput.files[0]);
-    formData.append('paces', paceChanges);
     formData.append('time', time);
-    formData.append('loop', isLoop);
-    formData.append('alg', algorithm);
 
     // Check if the file extension is .gpx
     const fileExtension = fileInput.files[0].name.split('.').pop().toLowerCase();
@@ -70,41 +63,74 @@ document.getElementById('submitBtn').addEventListener('click', async function (e
         const blob = await response.blob();
         const zip = await JSZip.loadAsync(blob);
 
-        // Extract the JSON file
-        const jsonFile = await zip.file(/.*\.json$/)[0]?.async("text");
+        // Specify the expected filenames
+        const presetSegmentsFileName = "presetSegments.json";
+        const optimalPacesFileName = "optimalPaces.json";
+        const segmentLengthsFileName = "segmentLengths.json";
+        const coordinatesFileName = "coordinates.json";
 
-        // Extract the miles CSV file
-        const mileJSON = await zip.file(/.*_miles\.json$/)[0]?.async("text");
+        // Extract each file from the zip
+        const presetSegmentsTxt = await zip.file(presetSegmentsFileName)?.async("text");
+        const optimalPacesTxt = await zip.file(optimalPacesFileName)?.async("text");
+        const segmentLengthsTxt = await zip.file(segmentLengthsFileName)?.async("text");
+        const coordinatesTxt = await zip.file(coordinatesFileName)?.async("text");
 
-        // Extract the regular segments TXT file
-        const segmentsJSON = await zip.file(/.*_segments\.json$/)[0]?.async("text");
-        const jsonData = JSON.parse(jsonFile);
+        if (!presetSegmentsTxt || !optimalPacesTxt || !segmentLengthsTxt || !coordinatesTxt) {
+            throw new Error("Backend response missing required data.");
+        }
 
-        // right now I save the geojson data and text file content to local storage, might 
-        // need to change it if this related data becomes > 5MB
-        modifyGeoJSON(jsonData);
-        // save in localstorage to pass to map
-        console.log(segmentsJSON);
-        sessionStorage.setItem('segments', segmentsJSON);
-        sessionStorage.setItem('miles', mileJSON);
+        // Parse the JSON content of each file
+        const presetSegments = JSON.parse(presetSegmentsTxt);
+        const optimalPaces = JSON.parse(optimalPacesTxt);
+        const segmentLengths = JSON.parse(segmentLengthsTxt);
+        const coordinates = JSON.parse(coordinatesTxt);
 
-        await deleteFile(paceChanges, time, algorithm, filename);
-        //console.log(mileJSON);
-        //console.log(segmentsJSON)
+        // console.log("presetSegments", presetSegments);
+        // console.log("optimalPaces", optimalPaces);
+        // console.log("segmentLengths", segmentLengths);
+        // console.log("coordinates", coordinates);
+
+        const courseName = fileInput.files[0].name.split('.')[0];
+
+        // Store all data in sessionStorage
+        sessionStorage.setItem('presetSegments', JSON.stringify(presetSegments));
+        sessionStorage.setItem('optimalPaces', JSON.stringify(optimalPaces));
+        sessionStorage.setItem('segmentLengths', JSON.stringify(segmentLengths));
+        sessionStorage.setItem('coordinates', JSON.stringify(coordinates));
+        sessionStorage.setItem('courseName', courseName);
+        sessionStorage.setItem('targetTime', time);
+
+        // Choose a default segment plan (e.g., first key in presetSegments)
+        const defaultPlanName = 'HILL';
+        const defaultSegments = presetSegments[defaultPlanName];
+
+        if (!defaultSegments) {
+            throw new Error("No default segment plan found.");
+        }
+
+        // Store the default segment plan in sessionStorage
+        sessionStorage.setItem('segments', JSON.stringify(defaultSegments));
+        sessionStorage.setItem('currentPlanName', defaultPlanName);
+
+        // Call updateFiles to generate the necessary files in sessionStorage
+        updateFiles();
+
+        // Trigger map update
+        if (window.myApp && typeof window.myApp.loadMapData === 'function') {
+            window.myApp.loadMapData();
+        }
+
+        await deleteFile(filename);
+
     } catch (error) {
         console.error('Error:', error);
-        // only feed in regular gpx file if algorithm fails for some reason
-        const geojson = toGeoJSON.gpx(xmlDoc);
-        modifyGeoJSON(geojson);
+        alert("An error occurred while processing your request.");
     } finally {
-        sessionStorage.setItem('filename', filename);
         document.getElementById('loadingScreen').style.display = 'none';
         fileInput.value = '';
-        // should just reload the page
-        window.location.reload();
     }
 
-    async function deleteFile(paces, time, algorithm, filename) {
+    async function deleteFile(filename) {
         // Construct the request URL (assuming the route for deletion is '/delete')
         // const url = 'https://perfect-pace-container.0pr6sav0peebr.us-east-2.cs.amazonlightsail.com/delete';
         const url =
@@ -118,12 +144,7 @@ document.getElementById('submitBtn').addEventListener('click', async function (e
             headers: {
                 'Content-Type': 'application/json', // Set content type to JSON
             },
-            body: JSON.stringify({
-                "paces": paces,         // Pace value
-                "time": time,           // Time value
-                "alg": algorithm, // Algorithm type (e.g., 'DP' or 'LP')
-                "filename": filename    // Filename to delete
-            })
+            body: JSON.stringify({ filename })
         })
             .then(response => response.json()) // Parse the response as JSON
             .then(data => {
@@ -134,66 +155,5 @@ document.getElementById('submitBtn').addEventListener('click', async function (e
             .catch(error => {
                 console.error('Error during DELETE request:', error);
             });
-    }
-
-
-    function modifyGeoJSON(geojson) {
-        // Check if we have at least one feature
-        if (geojson.features.length === 0) {
-            console.error("No features available in the GeoJSON data.");
-            return;
-        }
-        if (("pace" in geojson.features[0].properties)) {
-            const brightColors = [
-                '#FF0000', // Red (Bright)
-                '#FFFF00', // Yellow
-                '#00FF00', // Green
-                '#00FFFF', // Cyan
-                '#FF00FF', // Magenta
-                '#FFA500', // Orange
-                '#0000FF', // Blue
-                '#800080', // Purple
-                '#008000', // Dark Green (Dark)
-            ];
-            const paces = geojson.features.map(feature => feature.properties.pace);
-
-            // Sort paces in ascending order (smallest to largest)
-            const sortedPaces = [...paces].sort((a, b) => a - b);
-
-            // Find the color corresponding to each pace
-            geojson.features.forEach(feature => {
-                const pace = feature.properties.pace;
-
-                // Find the index of the pace in the sorted array
-                const paceIndex = sortedPaces.indexOf(pace);
-
-                // Map the pace index to a color in the brightColors array
-                // Use modulo in case there are more paces than colors
-                const color = brightColors[paceIndex % brightColors.length];
-
-                // Assign the color to the feature's properties
-                feature.properties.color = color;
-            });
-
-            // Loop through the segments array to split coordinates
-            console.log("Updated GeoJSON with color assignments:", geojson);
-        } else {
-            // If no paces, just initialize with random pace
-            geojson.features.forEach(feature => {
-                feature.properties.pace = Math.floor(Math.random() * 5) + 1; // Random value between 1 and 5
-                feature.properties.color = '#0000FF';
-            });
-        }
-
-        // Add summary to the feature collection
-        geojson.properties = {
-            label: "pace"
-        };
-
-        // Store the modified GeoJSON in local storage
-        sessionStorage.setItem('geoData', JSON.stringify(geojson));
-        console.log(JSON.stringify(geojson))
-
-        console.log("GeoJSON modified with segmented features and stored.");
     }
 });

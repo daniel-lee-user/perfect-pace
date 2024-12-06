@@ -1,16 +1,28 @@
 export function updateFiles() {
     // Read required information from sessionStorage
-    const segments = JSON.parse(sessionStorage.getItem("segments"));
+    const presetSegments = JSON.parse(sessionStorage.getItem("presetSegments"));
     const optimalPaces = JSON.parse(sessionStorage.getItem("optimalPaces"));
     const segmentLengths = JSON.parse(sessionStorage.getItem("segmentLengths"));
     const coordinates = JSON.parse(sessionStorage.getItem("coordinates"));
     const courseName = sessionStorage.getItem("courseName");
     const targetTime = sessionStorage.getItem("targetTime");
 
-    if (!segments || !optimalPaces || !segmentLengths || !coordinates) {
+    if (!presetSegments || !optimalPaces || !segmentLengths || !coordinates) {
         console.error("Missing required information in sessionStorage.");
         return;
     }
+
+    const selectedPlanName = document.getElementById('segment-select-widget').value;
+
+    // Get the segments based on the selected type
+    const segments = presetSegments[selectedPlanName];
+
+    if (!segments) {
+        throw new Error(`No segment plan found for type: ${selectedPlanName}`);
+    }
+
+    // Store the selected segment plan in sessionStorage
+    sessionStorage.setItem('segments', JSON.stringify(segments));
 
     updateGeoData(segments, optimalPaces, coordinates);
     updateSegmentPaces(segments, optimalPaces, segmentLengths, courseName, targetTime);

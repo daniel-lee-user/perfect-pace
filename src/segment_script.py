@@ -2,7 +2,7 @@ import argparse
 import os
 import json
 import numpy as np
-from segmenting_plan import SegmentingPlan, AveragePacePlan, AveragePacePerMilePlan, HillDetectionPlan
+from segmenting_plan import *
 from optimal_pacing_calculator import OptimalPacingCalculator
 import race_course
 import logging
@@ -31,7 +31,7 @@ def init_parser() -> argparse.ArgumentParser:
     """
     parser = argparse.ArgumentParser()
     parser.add_argument("-f", "--file", help="Path to the GPX file", required=True)
-    parser.add_argument("-t", "--time", type=int, help="Goal time in minutes to complete the course", required=True)
+    parser.add_argument("-t", "--time", help="Goal time in minutes to complete the course", required=True)
     parser.add_argument("-o", "--output", help="Output directory (default: current directory)", default="results")
     parser.add_argument("-v", "--verbose", action="store_true", help="Enable verbose output")
     return parser
@@ -94,7 +94,7 @@ def main():
     args = parser.parse_args()
 
     file_path = args.file
-    target_time = args.time
+    target_time = float(args.time)
     verbose = args.verbose
 
     # Parse the course

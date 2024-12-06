@@ -30,6 +30,24 @@
 <body>
     <div class="container">
         <div id="table-container">
+            <div id="course-info-widget">
+                <h3>Course Information</h3>
+                <ul>
+                    <li>Course Name: <span id="course-name">N/A</span></li>
+                    <li>Total Distance: <span id="total-distance">0 mi</span></li>
+                    <li>Elevation Change: <span id="elevation-change">0 ft</span></li>
+                    <li>Goal Time: <span id="goal-time">00:00:00</span></li>
+                </ul>
+                <div>
+                    <label for="segment-select-widget">Segment Method:</label>
+                    <select id="segment-select-widget">
+                        <option value="HILL">Hill Detection</option>
+                        <option value="APPM">Per Mile</option>
+                        <option value="APPKM">Per Kilometer</option>
+                        <option value="AP">No Segments</option>
+                    </select>
+                </div>
+            </div>
             <h3>
                 <span id="table-label">Segment Data</span>
                 <select id="segment-select" class="segment-select">
@@ -41,23 +59,28 @@
                     <option value="metric">Metric</option>
                 </select>
             </h3>
-            <table id="data-table" border="1">
-                <tr>
-                    <th>Segment</th>
-                    <th>Start Distance</th>
-                    <th>Pace</th>
-                    <th>Segment Length</th>
-                </tr>
-            </table>
+            <div id="table-wrapper">
+                <table id="data-table" border="1">
+                    <tr>
+                        <th>Segment</th>
+                        <th>Start Distance</th>
+                        <th>Pace</th>
+                        <th>Segment Length</th>
+                    </tr>
+                </table>
+            </div>
+            <button id="clearButton" class="clear-button">Clear</button>
         </div>
+
 
         <!-- Placeholder box over the map -->
         <div id="paces-change">
             <h3>Upload GPX File</h3>
             <form>
                 <div class="form-group">
-                    <label for="time">Goal Time (Minutes):
-                        <input type="number" id="time" name="time" min="1">
+                    <label for="time">Goal Time:
+                        <input type="text" id="time" name="time" placeholder="hh:mm:ss"
+                            pattern="^([0-1]?[0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]$" required>
                     </label>
                 </div>
                 <div class="form-group">

@@ -1,39 +1,45 @@
 import { updateFiles } from './updatefiles.js';
 
+// Add event listener for the segment type selection dropdown
+document.getElementById('segment-select-widget').addEventListener('change', () => {
+    console.log('Segment type changed.');
+    console.log('Loading map data...');
+
+    // Display the loading screen
+    document.getElementById('loadingScreen').style.display = 'block';
+
+    // Allow the DOM to update before starting computations
+    setTimeout(() => {
+        try {
+            updateFiles(); // Perform necessary calculations
+
+            // Trigger map update
+            if (window.myApp && typeof window.myApp.loadMapData === 'function') {
+                window.myApp.loadMapData();
+            }
+
+            console.log('Map data loaded.');
+        } catch (error) {
+            console.error('Error loading map data:', error);
+        } finally {
+            // Hide the loading screen once done
+            document.getElementById('loadingScreen').style.display = 'none';
+        }
+    }, 100); // Short delay (100ms) to allow DOM to update
+});
+
+
 document.getElementById('submitBtn').addEventListener('click', async function (event) {
     event.preventDefault(); // Prevents the form from submitting and reloading immediately
 
     const fileInput = window.gpxFile;
-    if (!fileInput) {
-        alert("Please upload a gpx file");
-        return;
-    }
-    if (!fileInput.files.length) {
-        fileInput.value = '';
-        alert("Please select a valid GPX file.");
-        return;
-    }
-
-    const time = document.getElementById('time').value;
-    const filename = fileInput.files[0].name;
-
-    console.log("UPLOAD");
 
     // Check if required fields are filled
     if (!fileInput.files.length) {
         fileInput.value = '';
-        alert("Please select a valid GPX file.");
+        alert("Please upload a gpx file.");
         return;
     }
-
-    if (!time || time <= 0) {
-        alert("Please enter a valid time in minutes.");
-        return;
-    }
-
-    const formData = new FormData();
-    formData.append('file', fileInput.files[0]);
-    formData.append('time', time);
 
     // Check if the file extension is .gpx
     const fileExtension = fileInput.files[0].name.split('.').pop().toLowerCase();
@@ -42,6 +48,17 @@ document.getElementById('submitBtn').addEventListener('click', async function (e
         alert("Please select a valid GPX file.");
         return;
     }
+
+    const time = convertTimeToMinutes(document.getElementById('time').value);
+    const filename = fileInput.files[0].name;
+    const file = fileInput.files[0];
+
+    console.log("UPLOAD");
+
+    const formData = new FormData();
+
+    formData.append('file', file);
+    formData.append('time', time);
 
     try {
         document.getElementById('loadingScreen').style.display = 'block';
@@ -84,13 +101,9 @@ document.getElementById('submitBtn').addEventListener('click', async function (e
         const optimalPaces = JSON.parse(optimalPacesTxt);
         const segmentLengths = JSON.parse(segmentLengthsTxt);
         const coordinates = JSON.parse(coordinatesTxt);
-
-        // console.log("presetSegments", presetSegments);
-        // console.log("optimalPaces", optimalPaces);
-        // console.log("segmentLengths", segmentLengths);
-        // console.log("coordinates", coordinates);
-
         const courseName = fileInput.files[0].name.split('.')[0];
+        const totalDistance = segmentLengths.reduce((a, b) => a + b, 0.0);
+        const netElevation = coordinates[coordinates.length - 1][2] - coordinates[0][2];
 
         // Store all data in sessionStorage
         sessionStorage.setItem('presetSegments', JSON.stringify(presetSegments));
@@ -99,18 +112,8 @@ document.getElementById('submitBtn').addEventListener('click', async function (e
         sessionStorage.setItem('coordinates', JSON.stringify(coordinates));
         sessionStorage.setItem('courseName', courseName);
         sessionStorage.setItem('targetTime', time);
-
-        // Choose a default segment plan (e.g., first key in presetSegments)
-        const defaultPlanName = 'HILL';
-        const defaultSegments = presetSegments[defaultPlanName];
-
-        if (!defaultSegments) {
-            throw new Error("No default segment plan found.");
-        }
-
-        // Store the default segment plan in sessionStorage
-        sessionStorage.setItem('segments', JSON.stringify(defaultSegments));
-        sessionStorage.setItem('currentPlanName', defaultPlanName);
+        sessionStorage.setItem('totalDistance', totalDistance);
+        sessionStorage.setItem('netElevation', netElevation);
 
         // Call updateFiles to generate the necessary files in sessionStorage
         updateFiles();
@@ -157,3 +160,85 @@ document.getElementById('submitBtn').addEventListener('click', async function (e
             });
     }
 });
+
+document.getElementById('clearButton').addEventListener('click', () => {
+    if (!confirm('Are you sure you want to clear all data and reset the map?')) {
+        return; // Do nothing if the user cancels
+    }
+
+    // Clear session storage
+    sessionStorage.clear();
+
+    // Reset the map
+    if (window.myApp && window.myApp.map) {
+        // Remove all layers from the map
+        window.myApp.map.eachLayer((layer) => {
+            if (!layer._url) {
+                // Keep the base tile layer
+                window.myApp.map.removeLayer(layer);
+            }
+        });
+
+        // Reset the map view to the default state
+        window.myApp.map.setView([42.446, -76.4808], 13);
+    }
+
+    // Reset any UI elements
+    document.getElementById('data-table').innerHTML = `
+        <tr>
+            <th>Segment</th>
+            <th>Start Distance</th>
+            <th>Pace</th>
+            <th>Segment Length</th>
+        </tr>
+    `;
+
+    // Clear file input field if it exists
+    const fileInput = document.getElementById('gpxFile');
+    if (fileInput) {
+        fileInput.value = '';
+    }
+
+    // Reset course information widget
+    document.getElementById('course-info-widget').innerHTML = `
+        <h3>Course Information</h3>
+        <ul>
+            <li>Course Name: <span id="course-name">N/A</span></li>
+            <li>Total Distance: <span id="total-distance">0 mi</span></li>
+            <li>Elevation Change: <span id="elevation-change">0 ft</span></li>
+            <li>Goal Time: <span id="goal-time">00:00:00</span></li>
+        </ul>
+        <div>
+            <label for="segment-select-widget">Segment Method:</label>
+            <select id="segment-select-widget">
+                <option value="HILL">Hill Detection</option>
+                <option value="APPM">Per Mile</option>
+                <option value="APPKM">Per Kilometer</option>
+                <option value="AP">No Segments</option>
+            </select>
+        </div>
+    `;
+});
+
+
+function convertTimeToMinutes(time) {
+    // Regular expression to validate time in HH:MM:SS or MM:SS format
+    const timeRegex = /^((?:[0-1]?[0-9]|2[0-3]):)?([0-5]?[0-9]):([0-5][0-9])$/;
+
+    // Check if the input matches the format
+    const match = time.match(timeRegex);
+    if (!match) {
+        alert("Invalid time format. Please enter time in HH:MM:SS or MM:SS format.");
+        return null;
+    }
+
+    // Extract hours, minutes, and seconds from the match
+    const hours = match[1] ? parseInt(match[1].replace(":", ""), 10) : 0; // Default to 0 if no hours
+    const minutes = parseInt(match[2], 10);
+    const seconds = parseInt(match[3], 10);
+
+    // Calculate the total time in minutes
+    const totalMinutes = hours * 60 + minutes + seconds / 60;
+
+    return totalMinutes;
+}

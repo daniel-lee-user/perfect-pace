@@ -10,6 +10,7 @@ window.addEventListener('load', () => {
     // Check if the map already exists
     if (!window.myApp.map) {
         window.myApp.map = L.map('map').setView([42.446, -76.4808], 13);
+
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: 'Map data &copy; <a href="http://www.osm.org">OpenStreetMap</a>'
         }).addTo(window.myApp.map);
@@ -95,13 +96,14 @@ function loadMapData() {
 
         // Fit the map to the route bounds
         window.myApp.map.fitBounds(routeLayer.getBounds());
+
+        loadCourseInformation();
     }
 
     // Fetch and parse segment and mile data
     const segmentData = sessionStorage.getItem('segmentPaces');
     const mileData = sessionStorage.getItem('milePaces');
     const kilometerData = sessionStorage.getItem('kilometerPaces');
-    console.log(kilometerData);
 
     if (segmentData || mileData) {
         if (document.getElementById('segment-select').value === 'segments') {
@@ -141,8 +143,8 @@ function parseSegmentData(jsonData) {
             ? `${segmentLengthMi} mi`
             : `${segmentLengthKm} km`;
         const displayPace = document.getElementById('unit-select').value === 'imperial'
-            ? `${formatTime(pace)}/mile`
-            : `${formatTime(convertPaceToKmPerMinute(pace))}/km`;
+            ? `${formatTime(pace)} /mile`
+            : `${formatTime(convertPaceToKmPerMinute(pace))} /km`;
 
         // Append cells to the row
         [segmentNumber, displayStartDistance, displayPace, displaySegmentLength].forEach(value => {
@@ -197,6 +199,30 @@ function formatTime(minutes) {
 // Convert pace from minutes/mile to minutes/km
 function convertPaceToKmPerMinute(paceMinutes) {
     return (paceMinutes / 1.60934).toFixed(2);
+}
+
+function loadCourseInformation() {
+    const courseName = sessionStorage.getItem('courseName');
+    const totalDistance = sessionStorage.getItem('totalDistance');
+    const netElevation = sessionStorage.getItem('netElevation');
+    const targetTime = sessionStorage.getItem('targetTime');
+
+    const distanceUnit = document.getElementById('unit-select').value === 'imperial' ? ' mi' : ' km';
+    const elevationUnit = document.getElementById('unit-select').value === 'imperial' ? ' ft' : ' m';
+    const distanceConversion = document.getElementById('unit-select').value === 'imperial' ? 1 : 1.60934;
+    const elevationConversion = document.getElementById('unit-select').value === 'imperial' ? 1 : 0.3048;
+
+    const distanceTxt = (totalDistance * distanceConversion).toFixed(2) + distanceUnit;
+    const elevationTxt = (netElevation * elevationConversion).toFixed(2) + elevationUnit;
+
+    const courseNameElement = document.getElementById('course-name');
+    courseNameElement.textContent = courseName;
+    const distanceElement = document.getElementById('total-distance');
+    distanceElement.textContent = distanceTxt;
+    const elevationElement = document.getElementById('elevation-change');
+    elevationElement.textContent = elevationTxt;
+    const timeElement = document.getElementById('goal-time');
+    timeElement.textContent = formatTime(targetTime);
 }
 
 // Handle unit selection changes

@@ -53,21 +53,42 @@ function loadMapData() {
         }).addTo(window.myApp.map);
         window.myApp.routeLayer = routeLayer;
 
-        const unit = document.getElementById('unit-select').value === 'imperial' ? '/mi' : '/km';
+
+        const unit = document.getElementById('unit-select').value === 'imperial' ? 'Mile' : 'Kilometer';
+        const segmentType = document.getElementById('segment-select').value;
+        const headers = segmentType === 'segments'
+            ? ["Segment", "Start Distance", "Pace", "Segment Length"]
+            : [unit, "Elapsed Time", "Pace", "Segment Time"];
+
+        const table = document.getElementById('data-table');
+        table.innerHTML = ''; // Clear existing rows
+        const tableLabel = document.getElementById('table-label');
+        tableLabel.textContent = segmentType === 'segments' ? "Segment Data" : "Miles/Km Data";
+        // Update table headers
+        table.innerHTML = `
+            <tr>
+                <th>${headers[0]}</th>
+                <th>${headers[1]}</th>
+                <th>${headers[2]}</th>
+                <th>${headers[3]}</th>
+            </tr>
+        `;
+
+        const mins_per_unit = document.getElementById('unit-select').value === 'imperial' ? '/mi' : '/km';
         const conversion = document.getElementById('unit-select').value === 'imperial' ? 1 : 1.60934;
         geojson.features.forEach((feature, index) => {
             const coordinates = feature.geometry.coordinates;
             const startPoint = coordinates[0];
             const startMarker = L.marker([startPoint[1], startPoint[0]])
                 .addTo(window.myApp.map)
-                .bindPopup(`Start of Segment ${index + 1}: Pace = ${formatTime((feature.properties.pace / conversion).toFixed(2))} ${unit}`);
+                .bindPopup(`Start of Segment ${index + 1}: Pace = ${formatTime((feature.properties.pace / conversion).toFixed(3))} ${mins_per_unit}`);
             window.myApp.markers.push(startMarker); // Store the marker reference
 
             if (index === geojson.features.length - 1) {
                 const endPoint = coordinates[coordinates.length - 1];
                 const endMarker = L.marker([endPoint[1], endPoint[0]])
                     .addTo(window.myApp.map)
-                    .bindPopup(`End of Segment ${index + 1}: Pace = ${formatTime((feature.properties.pace / conversion).toFixed(2))} ${unit}`);
+                    .bindPopup(`End of Segment ${index + 1}: Pace = ${formatTime((feature.properties.pace / conversion).toFixed(3))} ${mins_per_unit}`);
                 window.myApp.markers.push(endMarker); // Store the marker reference
             }
         });
@@ -80,6 +101,7 @@ function loadMapData() {
     const segmentData = sessionStorage.getItem('segmentPaces');
     const mileData = sessionStorage.getItem('milePaces');
     const kilometerData = sessionStorage.getItem('kilometerPaces');
+    console.log(kilometerData);
 
     if (segmentData || mileData) {
         if (document.getElementById('segment-select').value === 'segments') {
@@ -179,52 +201,9 @@ function convertPaceToKmPerMinute(paceMinutes) {
 
 // Handle unit selection changes
 document.getElementById('unit-select').addEventListener('change', () => {
-    const unit = document.getElementById('unit-select').value === 'imperial' ? 'Mile' : 'Kilometer';
-    const segmentType = document.getElementById('segment-select').value;
-    const headers = segmentType === 'segments'
-        ? ["Segment", "Start Distance", "Pace", "Segment Length"]
-        : [unit, "Elapsed Time", "Pace", "Segment Time"];
-
-    const table = document.getElementById('data-table');
-    table.innerHTML = ''; // Clear existing rows
-
-    // Update table headers
-    table.innerHTML = `
-        <tr>
-            <th>${headers[0]}</th>
-            <th>${headers[1]}</th>
-            <th>${headers[2]}</th>
-            <th>${headers[3]}</th>
-        </tr>
-    `;
-
-    // Reload data based on the selected unit
     loadMapData();
 });
 
 document.getElementById('segment-select').addEventListener('change', () => {
-    // Set table headers based on the selected segment type
-    const unit = document.getElementById('unit-select').value === 'imperial' ? 'Mile' : 'Kilometer';
-    const segmentType = document.getElementById('segment-select').value;
-    const headers = segmentType === 'segments'
-        ? ["Segment", "Start Distance", "Pace", "Segment Length"]
-        : [unit, "Elapsed Time", "Pace", "Segment Time"];
-    const tableLabel = document.getElementById('table-label');
-    tableLabel.textContent = segmentType === 'segments' ? "Segment Data" : "Mile Data";
-
-    const table = document.getElementById('data-table');
-    table.innerHTML = ''; // Clear existing rows
-
-    // Update table headers
-    table.innerHTML = `
-        <tr>
-            <th>${headers[0]}</th>
-            <th>${headers[1]}</th>
-            <th>${headers[2]}</th>
-            <th>${headers[3]}</th>
-        </tr>
-    `;
-
-    // Reload data based on the selected type
     loadMapData();
 });

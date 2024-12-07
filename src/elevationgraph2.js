@@ -34,7 +34,7 @@ L.Control.Elevation = L.Control.extend({
         var segmentIndex = this._segmentIndex = [];
         var allPaces = this._allPaces = [];
         var sections = this._sections = [];
-        
+
         this._sectionColors = [
             'rgba(255, 99, 132, 0.3)',  // red
             'rgba(54, 162, 235, 0.3)',  // blue
@@ -57,7 +57,7 @@ L.Control.Elevation = L.Control.extend({
 
         var y = this._y = d3.scale.linear()
             .range([this._height(), 0]);
-        
+
         var y2 = this._y2 = d3.scale.linear()
             .range([this._height(), 0]);
 
@@ -109,10 +109,10 @@ L.Control.Elevation = L.Control.extend({
             }
         });
 
-        this._createSection = function(point) {
+        this._createSection = function (point) {
             const xVal = this._x.invert(point[0]);
             const yVal = this._y.invert(point[1]);
-            
+
             this._sections.push({
                 x: point[0],
                 y: point[1],
@@ -124,10 +124,10 @@ L.Control.Elevation = L.Control.extend({
             this._updateSections();
         };
 
-        this._updateSections = function() {
+        this._updateSections = function () {
             this._sectionsGroup.selectAll("*").remove();
             this._verticalLinesGroup.selectAll("*").remove();
-            
+
             this._verticalLinesGroup.selectAll(".vertical-line")
                 .data(this._sections)
                 .enter()
@@ -160,7 +160,7 @@ L.Control.Elevation = L.Control.extend({
 
                 for (let i = 0; i < fullSections.length - 1; i++) {
                     const colorIndex = i % this._sectionColors.length;
-                    
+
                     this._sectionsGroup.append("rect")
                         .attr("x", fullSections[i].x)
                         .attr("y", 0)
@@ -172,8 +172,8 @@ L.Control.Elevation = L.Control.extend({
             }
 
             this._verticalLinesGroup.selectAll(".section-label")
-                .data(this._sections.length > 0 ? 
-                    [{ x: 0, index: 0 }].concat(this._sections.map((d, i) => ({ x: d.x, index: i + 1 }))) : 
+                .data(this._sections.length > 0 ?
+                    [{ x: 0, index: 0 }].concat(this._sections.map((d, i) => ({ x: d.x, index: i + 1 }))) :
                     [])
                 .enter()
                 .append("text")
@@ -210,7 +210,7 @@ L.Control.Elevation = L.Control.extend({
 
         // Checkbox for Pace Overlay
         const paceDiv = L.DomUtil.create('div', '', controlContainer);
-        paceDiv.style.display = 'flex'; 
+        paceDiv.style.display = 'flex';
         paceDiv.style.alignItems = 'center';
         const paceCheckbox = L.DomUtil.create('input', '', paceDiv);
         paceCheckbox.type = 'checkbox';
@@ -222,7 +222,7 @@ L.Control.Elevation = L.Control.extend({
 
         // Checkbox for Move Segments
         const moveDiv = L.DomUtil.create('div', '', controlContainer);
-        moveDiv.style.display = 'flex'; 
+        moveDiv.style.display = 'flex';
         moveDiv.style.alignItems = 'center';
         const moveSectionsCheckbox = L.DomUtil.create('input', '', moveDiv);
         moveSectionsCheckbox.type = 'checkbox';
@@ -249,14 +249,52 @@ L.Control.Elevation = L.Control.extend({
                 ...this._sections,
                 { dist: this._x.invert(this._width()) }
             ];
-            
-            // TODO send this to backend
-            for (let i = 0; i < allPoints.length - 1; i++) {
-                const start = allPoints[i].dist;
-                const end = allPoints[i + 1].dist;
-                console.log(`Segment ${i + 1}: ${start.toFixed(3)} to ${end.toFixed(3)}`);
+            const segmentStartDistances = allPoints.map(point => parseFloat((point.dist / 1.60934).toFixed(3)));
+            const segmentLengths = JSON.parse(sessionStorage.getItem("segmentLengths"));
+
+            if (!segmentLengths) {
+                console.error("Missing required information in sessionStorage.");
+                return;
+            }
+
+            // Calculate cumulative distances for each point in the segmentLengths array
+            const cumulativeDistances = segmentLengths.reduce((acc, length) => {
+                acc.push((acc.length > 0 ? acc[acc.length - 1] : 0) + length);
+                return acc;
+            }, []);
+
+            // Find the indices of the closest points to the segment start distances
+            const segmentStartIndices = segmentStartDistances.map((startDist, index) => {
+                if (index === segmentStartDistances.length - 1) {
+                    // Set the last index to be the length of segmentLengths
+                    return segmentLengths.length;
+                }
+
+                let closestIndex = 0;
+                let minDifference = Infinity;
+
+                cumulativeDistances.forEach((cumDist, idx) => {
+                    const difference = Math.abs(cumDist - startDist);
+                    if (difference < minDifference) {
+                        minDifference = difference;
+                        closestIndex = idx;
+                    }
+                });
+
+                return closestIndex;
+            });
+
+            // Set custom segments
+            sessionStorage.setItem("customSegments", JSON.stringify(segmentStartIndices));
+
+            // Change segmenting method to custom
+            const segmentSelectWidget = document.getElementById('segment-select-widget');
+            if (segmentSelectWidget) {
+                segmentSelectWidget.value = 'CUSTOM';
+                segmentSelectWidget.dispatchEvent(new Event('change'));
             }
         };
+
 
         // Add event listeners for checkboxes
         paceCheckbox.addEventListener('change', () => {
@@ -282,7 +320,7 @@ L.Control.Elevation = L.Control.extend({
         if (this._data) {
             this._applyData();
         }
-        
+
         this._moveSectionsMode = false;
         this._draggedSection = null;
 
@@ -295,25 +333,25 @@ L.Control.Elevation = L.Control.extend({
         background.on("mousedown", (event) => {
             if (this._moveSectionsMode) {
                 const mouseCoords = d3.mouse(g.node());
-                const nearestSection = this._sections.find(section => 
+                const nearestSection = this._sections.find(section =>
                     Math.abs(section.x - mouseCoords[0]) < 10
                 );
-                
+
                 if (nearestSection) {
                     this._draggedSection = nearestSection;
                 }
             }
         });
-        
+
         // Shift click deletes line
         background.on("click", (event) => {
             if (d3.event.shiftKey) {
                 const mouseCoords = d3.mouse(g.node());
-                
-                const nearestSectionIndex = this._sections.findIndex(section => 
+
+                const nearestSectionIndex = this._sections.findIndex(section =>
                     Math.abs(section.x - mouseCoords[0]) < 10
                 );
-                
+
                 if (nearestSectionIndex !== -1) {
                     this._sections.splice(nearestSectionIndex, 1);
                     this._updateSections();
@@ -326,12 +364,12 @@ L.Control.Elevation = L.Control.extend({
         background.on("mousemove", (event) => {
             if (this._moveSectionsMode && this._draggedSection) {
                 const mouseCoords = d3.mouse(g.node());
-                
+
                 this._draggedSection.x = mouseCoords[0];
                 this._draggedSection.dist = this._x.invert(mouseCoords[0]);
-                
+
                 this._sections.sort((a, b) => a.x - b.x);
-                
+
                 this._updateSections();
             }
         });
@@ -601,7 +639,7 @@ L.Control.Elevation = L.Control.extend({
     },
     _appendYaxis2: function (y) {
         y.attr("class", "y axis")
-            .attr("transform", "translate(" + this._width() + " ,0)")   
+            .attr("transform", "translate(" + this._width() + " ,0)")
             .call(d3.svg.axis()
                 .scale(this._y2)
                 .ticks(this.options.yTicks)
@@ -993,7 +1031,7 @@ L.Control.Elevation = L.Control.extend({
     },
 
     _showPaceMarkers: function () {
-        if(this._paceOverlay) {
+        if (this._paceOverlay) {
             d3.select(this._container).select("svg").selectAll(".pace-line")
                 .attr('visibility', 'visible');
             return;
@@ -1003,7 +1041,7 @@ L.Control.Elevation = L.Control.extend({
         //console.log(this._allPaces);
         this._segmentIndex.forEach((element, index) => {
             var paceGroup = g.append("g");
-            if(index == this._segmentIndex.length-1) {
+            if (index == this._segmentIndex.length - 1) {
                 // if its the last index just do the last line to the end
                 var xCoordinate = this._data[element].xDiagCoord;
                 var paceValue = this._data[element].pace.toFixed(2);
@@ -1019,9 +1057,9 @@ L.Control.Elevation = L.Control.extend({
                 return;
             }
             var xCoordinate = this._data[element].xDiagCoord;
-            var xCoordinate2 = this._data[this._segmentIndex[index+1]].xDiagCoord;
+            var xCoordinate2 = this._data[this._segmentIndex[index + 1]].xDiagCoord;
             var paceValue = this._data[element].pace.toFixed(2);
-            var paceValue2 = this._data[this._segmentIndex[index+1]].pace.toFixed(2);
+            var paceValue2 = this._data[this._segmentIndex[index + 1]].pace.toFixed(2);
             var yValue = this._y2(paceValue);
             var yValue2 = this._y2(paceValue2);
             // Group for each pace marker

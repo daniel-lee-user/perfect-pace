@@ -55,12 +55,7 @@ document.getElementById('fileInput').addEventListener('change', async function (
     try {
         document.getElementById('loadingScreen').style.display = 'block';
 
-        // const url = 'https://perfect-pace-container.0pr6sav0peebr.us-east-2.cs.amazonlightsail.com/upload';
-        const url =
-            window.location.hostname === "127.0.0.1" || window.location.hostname === "localhost"
-                ? "http://127.0.0.1:5000/upload"
-                : "https://perfect-pace-container.0pr6sav0peebr.us-east-2.cs.amazonlightsail.com/upload";
-
+        const url = 'https://perfect-pace-container.0pr6sav0peebr.us-east-2.cs.amazonlightsail.com/upload';
         const response = await fetch(url, {
             method: "POST",
             body: formData,
@@ -105,11 +100,7 @@ document.getElementById('fileInput').addEventListener('change', async function (
 
     function deleteFile(paces, time, algorithm, filename) {
         // Construct the request URL (assuming the route for deletion is '/delete')
-        // const url = 'https://perfect-pace-container.0pr6sav0peebr.us-east-2.cs.amazonlightsail.com/delete';
-        const url =
-            window.location.hostname === "127.0.0.1" || window.location.hostname === "localhost"
-                ? "http://127.0.0.1:5000/delete"
-                : "https://perfect-pace-container.0pr6sav0peebr.us-east-2.cs.amazonlightsail.com/delete";
+        const url = 'https://perfect-pace-container.0pr6sav0peebr.us-east-2.cs.amazonlightsail.com/delete';
 
         // Send a DELETE request with JSON payload
         fetch(url, {

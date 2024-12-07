@@ -24,8 +24,6 @@ class Conversions(Enum):
     FEET_TO_METERS = 0.3048
     METERS_TO_KM = 1000
     KM_TO_METERS = 0.001
-    MILES_TO_KM = 1.60934
-    KM_TO_MILES = 0.621371
 
 def get_pace_display_text(pace):
     m, s = divmod(pace*60, 60)

@@ -7,23 +7,37 @@ export function updateFiles() {
     const courseName = sessionStorage.getItem("courseName");
     const targetTime = sessionStorage.getItem("targetTime");
 
-    if (!presetSegments || !optimalPaces || !segmentLengths || !coordinates) {
+    if (!optimalPaces || !segmentLengths || !coordinates) {
         console.error("Missing required information in sessionStorage.");
         return;
     }
 
     const selectedPlanName = document.getElementById('segment-select-widget').value;
 
-    // Get the segments based on the selected type
-    const segments = presetSegments[selectedPlanName];
-
-    if (!segments) {
-        throw new Error(`No segment plan found for type: ${selectedPlanName}`);
+    let segments;
+    if (selectedPlanName === "CUSTOM") {
+        // Fetch custom segments from sessionStorage
+        const customSegments = JSON.parse(sessionStorage.getItem("customSegments"));
+        if (!customSegments) {
+            throw new Error("No custom segments found. Please define custom segments.");
+        }
+        segments = customSegments;
+    } else {
+        // Fetch preset segments
+        if (!presetSegments) {
+            console.error("Preset segments not available.");
+            return;
+        }
+        segments = presetSegments[selectedPlanName];
+        if (!segments) {
+            throw new Error(`No segment plan found for type: ${selectedPlanName}`);
+        }
     }
 
     // Store the selected segment plan in sessionStorage
-    sessionStorage.setItem('segments', JSON.stringify(segments));
+    sessionStorage.setItem("segments", JSON.stringify(segments));
 
+    // Update files and map data
     updateGeoData(segments, optimalPaces, coordinates);
     updateSegmentPaces(segments, optimalPaces, segmentLengths, courseName, targetTime);
     updateMiles(segments, optimalPaces, segmentLengths, courseName, targetTime);

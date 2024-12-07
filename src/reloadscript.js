@@ -115,6 +115,12 @@ document.getElementById('submitBtn').addEventListener('click', async function (e
         sessionStorage.setItem('totalDistance', totalDistance);
         sessionStorage.setItem('netElevation', netElevation);
 
+        // Set segment method to default (Hill Detection)
+        const segmentSelectWidget = document.getElementById('segment-select-widget');
+        if (segmentSelectWidget) {
+            segmentSelectWidget.value = 'HILL';
+        }
+
         // Call updateFiles to generate the necessary files in sessionStorage
         updateFiles();
 

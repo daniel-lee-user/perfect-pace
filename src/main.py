@@ -101,7 +101,7 @@ def main():
         print(f'\n{str(course)}')
 
     course_directory = os.path.dirname(file_path)+'/results/'+course_name +'/'
-    print(course_directory)
+
     if not os.path.exists(course_directory):
         os.makedirs(course_directory)
 

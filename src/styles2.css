@@ -10,83 +10,15 @@ body {
     display: flex;
     height: 100%;
     flex-direction: row;
-    position: relative;
-    /* Make the container the reference point for absolute positioning */
+    position: relative; /* Make the container the reference point for absolute positioning */
 }
 
 #table-container {
-    position: absolute;
-    /* Ensure the container is positioned relative to the viewport */
-    left: 0;
-    /* Align to the left */
-    top: 0;
-    /* Align to the top */
-    height: 100%;
-    /* Full height of the viewport */
-    width: 20vw;
-    /* Fixed width */
+    width: 20vw; /* Set to 20% of the viewport width */
     min-width: 200px;
-    /* Minimum width */
     overflow-y: auto;
-    /* Scroll if content overflows */
-    background-color: #f9f9f9;
-    /* Light background for visibility */
-    border-right: 1px solid #ccc;
-    /* Optional border for separation */
-    display: flex;
-    flex-direction: column;
-    z-index: 1000;
-    /* Bring the container to the front */
-    box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
-    /* Optional shadow effect */
+    order: 1;
 }
-
-#table-wrapper {
-    flex: 1;
-    /* Take up all available space */
-    overflow-y: auto;
-    /* Enable vertical scrolling */
-}
-
-#data-table {
-    width: 100%;
-    /* Make the table span the full width of the container */
-    /* border-collapse: collapse; */
-    /* Remove spacing between table borders */
-    text-align: center;
-    /* Center-align text in all table cells */
-    table-layout: fixed;
-    /* Ensure consistent column widths */
-}
-
-#data-table th,
-#data-table td {
-    padding: 5px;
-    /* Add padding for readability */
-    border: 1px solid #ccc;
-    /* Add a border to all cells */
-}
-
-#data-table th {
-    background-color: #f4f4f4;
-    /* Light background for headers */
-    font-weight: bold;
-}
-
-#data-table td {
-    vertical-align: middle;
-    /* Vertically center the text in cells */
-}
-
-#map {
-    flex: 1;
-    height: 100%;
-    position: relative;
-    /* Ensure the map stays behind the container */
-    z-index: 0;
-    /* Push the map to the back */
-}
-
 .form-group {
     margin-bottom: 15px;
 }
@@ -137,28 +69,20 @@ h3 {
     flex: 1;
     height: 100%;
     order: 2;
-    position: relative;
-    /* Ensure that map is the base for positioning */
+    position: relative; /* Ensure that map is the base for positioning */
 }
 
 #paces-change {
-    position: absolute;
-    /* Absolute positioning */
-    bottom: 10px;
-    /* Distance from the bottom */
-    right: 10px;
-    /* Distance from the right */
-    width: 20vw;
-    /* Set a fixed width */
+    position: absolute; /* Absolute positioning */
+    bottom: 10px; /* Distance from the bottom */
+    right: 10px; /* Distance from the right */
+    width: 20vw; /* Set a fixed width */
     min-width: 150px;
-    background: rgba(255, 255, 255, 0.8);
-    /* Semi-transparent background */
+    background: rgba(255, 255, 255, 0.8); /* Semi-transparent background */
     padding: 10px;
     border: 1px solid #ccc;
-    z-index: 10000;
-    /* Ensure it's above the map */
-    box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
-    /* Optional shadow for visibility */
+    z-index: 10000; /* Ensure it's above the map */
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.3); /* Optional shadow for visibility */
 }
 
 #loadingScreen {
@@ -179,153 +103,40 @@ h3 {
     margin-left: 10px;
 }
 
-/* Adjust the zoom control container's position */
-.leaflet-control-zoom {
-    position: absolute !important;
-    /* Ensure custom positioning */
-    left: calc(20vw);
-    /* Position it 10px from the edge of the table container */
-    z-index: 1001;
-    /* Keep it above the map but below the table */
-    background: rgba(255, 255, 255, 0.8);
-    /* Optional: Add a background for better visibility */
-}
-
-#course-info-widget {
-    flex-shrink: 0;
-    /* Prevent shrinking */
-    background: #f9f9f9;
-    /* Match background color */
-    border-top: 1px solid #ccc;
-    border-bottom: 3px solid #000000;
-    padding: 10px;
-    box-shadow: 0 -1px 5px rgba(0, 0, 0, 0.1);
-    /* Subtle shadow for separation */
-    position: sticky;
-    /* Stay at the bottom of the container */
-    bottom: 0;
-    z-index: 1;
-    /* Ensure it stays above the table content */
-}
-
-#course-info-widget h3 {
-    margin: 0 0 10px 0;
-    /* font-size: 16px; */
-    text-align: center;
-}
-
-#course-info-widget ul {
-    list-style: none;
-    padding: 0;
-    margin: 0 0 10px 0;
-}
-
-#course-info-widget li {
-    font-size: 16px;
-    margin-bottom: 5px;
-    font-weight: bold
-}
-
-#course-info-widget li span {
-    font-weight: normal
-}
-
-#course-info-widget label {
-    font-size: 16px;
-    font-weight: bold;
-}
-
-#course-info-widget select {
-    width: 100%;
-    padding: 5px;
-    font-size: 14px;
-    border: 1px solid rgb(118, 118, 118);
-    border-radius: 4px;
-}
-
-/* Ensure scrolling doesn't affect the widget */
-#table-wrapper::-webkit-scrollbar {
-    width: 8px;
-}
-
-#table-wrapper::-webkit-scrollbar-thumb {
-    background: #ccc;
-    border-radius: 4px;
-}
-
-#table-wrapper::-webkit-scrollbar-thumb:hover {
-    background: #aaa;
-}
-
-.clear-button {
-    padding: 15px 15px;
-    font-size: 14px;
-    font-weight: bold;
-    color: white;
-    background-color: #d9534f;
-    border: none;
-    border-radius: 5px;
-    box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
-    cursor: pointer;
-    transition: background-color 0.3s;
-    margin-top: 10px;
-    margin-bottom: 10px;
-    margin-left: 5px;
-    margin-right: 5px;
-}
-
-.clear-button:hover {
-    background-color: #c9302c;
-}
-
-
 /* Media Query for Smaller Screens */
 @media (max-width: 1200px) {
     #table-container {
-        width: 15vw;
-        /* Set to 15% of the viewport width */
+        width: 15vw; /* Set to 15% of the viewport width */
         min-width: 150px;
     }
 }
 
 @media (max-width: 768px) {
     #table-container {
-        width: 25vw;
-        /* Set to 25% of the viewport width */
+        width: 25vw; /* Set to 25% of the viewport width */
         min-width: 120px;
     }
 }
 
 /* Mobile Screens */
 @media (max-width: 480px) {
-
-    #table-container,
-    #paces-change {
-        width: 100%;
-        /* Full width on small screens */
+    #table-container, #paces-change {
+        width: 100%; /* Full width on small screens */
         min-width: 0;
     }
-
     .container {
-        flex-direction: column;
-        /* Stack elements vertically on very small screens */
+        flex-direction: column; /* Stack elements vertically on very small screens */
     }
-
+    
     #paces-change {
-        position: relative;
-        /* Make it position relative instead of absolute */
-        bottom: auto;
-        /* Remove bottom positioning */
-        right: auto;
-        /* Remove right positioning */
-        width: 100%;
-        /* Full width */
-        margin-top: 10px;
-        /* Space between the map and the pace-change div */
+        position: relative; /* Make it position relative instead of absolute */
+        bottom: auto; /* Remove bottom positioning */
+        right: auto; /* Remove right positioning */
+        width: 100%; /* Full width */
+        margin-top: 10px; /* Space between the map and the pace-change div */
     }
-
+    
     #map {
-        order: 1;
-        /* Move map above the pace-change div in mobile view */
+        order: 1; /* Move map above the pace-change div in mobile view */
     }
 }

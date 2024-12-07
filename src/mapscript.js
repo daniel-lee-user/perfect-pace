@@ -172,7 +172,7 @@ function parseMileIndexData(jsonData) {
 
         const unit = document.getElementById('unit-select').value === 'imperial' ? '/mile' : '/km';
         // Append row to table
-        [mileIndex, `${elapsedTime}`, `${pacePerMile}${unit}`, `${timePerMile}`].forEach(value => {
+        [mileIndex, `${elapsedTime}`, `${pacePerMile} ${unit}`, `${timePerMile}`].forEach(value => {
             const cell = document.createElement('td');
             cell.textContent = value;
             row.appendChild(cell);

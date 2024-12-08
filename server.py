@@ -23,7 +23,14 @@ def upload_file():
     logger.info("RECEIVED REQUEST")
     file = request.files.get('file')
     filename = request.form.get('filename')
-    save_directory = os.path.join(os.path.dirname(__file__), '..', 'perfect_pace_data')
+    from pathlib import Path
+
+    # Get the directory of the current script or use the current working directory
+    script_dir = Path(__file__).resolve().parent if '__file__' in globals() else Path.cwd()
+    save_directory = script_dir.parent / 'perfect_pace_data'
+
+    print('Save Directory:', save_directory)
+    print('Dirname:', script_dir)
 
     # If file is not provided, check for the filename
     if not file:

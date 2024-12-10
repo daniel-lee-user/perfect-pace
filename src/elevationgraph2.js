@@ -5,10 +5,10 @@ L.Control.Elevation = L.Control.extend({
         width: 600,
         height: 175,
         margins: {
-            top: 10,
-            right: 40,
+            top: 20,
+            right: 50,
             bottom: 30,
-            left: 60
+            left: 50
         },
         useHeightIndicator: true,
         interpolation: "linear",
@@ -103,12 +103,6 @@ L.Control.Elevation = L.Control.extend({
             .style("stroke", "none")
             .style("pointer-events", "all");
 
-        background.on("click", (event) => {
-            if (true) {
-                this._createSection(d3.mouse(g.node()));
-            }
-        });
-
         this._createSection = function (point) {
             const xVal = this._x.invert(point[0]);
             const yVal = this._y.invert(point[1]);
@@ -176,13 +170,13 @@ L.Control.Elevation = L.Control.extend({
                     [{ x: 0, index: 0 }].concat(this._sections.map((d, i) => ({ x: d.x, index: i + 1 }))) :
                     [])
                 .enter()
-                .append("text")
-                .attr("class", "section-label")
-                .attr("x", d => d.x + 5)
-                .attr("y", 15)
-                .text(d => `Segment ${d.index + 1}`)
-                .style("font-size", "12px")
-                .style("fill", "#000");
+            // .append("text")
+            // .attr("class", "section-label")
+            // .attr("x", d => d.x + 5)
+            // .attr("y", 15)
+            // .text(d => `Segment ${d.index + 1}`)
+            // .style("font-size", "12px")
+            // .style("fill", "#000");
         };
 
         if (L.Browser.touch) {
@@ -204,24 +198,56 @@ L.Control.Elevation = L.Control.extend({
         controlContainer.style.margin = 'auto';
         controlContainer.style.width = '100%';
         controlContainer.style.display = 'flex';
-        controlContainer.style.justifyContent = 'center';
-        controlContainer.style.alignItems = 'center';
-        controlContainer.style.gap = '20px';
+        controlContainer.style.flexDirection = 'column'; // Use column layout
+        controlContainer.style.alignItems = 'center'; // Center items horizontally
+        controlContainer.style.gap = '2px'; // Add spacing between items
 
-        // Checkbox for Pace Overlay
-        const paceDiv = L.DomUtil.create('div', '', controlContainer);
-        paceDiv.style.display = 'flex';
-        paceDiv.style.alignItems = 'center';
-        const paceCheckbox = L.DomUtil.create('input', '', paceDiv);
-        paceCheckbox.type = 'checkbox';
-        paceCheckbox.id = 'paceCheckbox';
-        const paceLabel = L.DomUtil.create('label', '', paceDiv);
-        paceLabel.htmlFor = 'paceCheckbox';
-        paceLabel.innerText = 'Show Pace Overlay';
-        paceLabel.style.marginLeft = '5px';
+
+        // Add radio buttons for display modes
+        this._modeDiv = L.DomUtil.create('div', '', controlContainer);
+        this._modeDiv.style.display = 'flex';
+        this._modeDiv.style.alignItems = 'center';
+        this._modeDiv.style.gap = '10px';
+
+
+        const modes = [
+            { id: 'elevationOnly', label: 'Elevation Only' },
+            { id: 'showSegments', label: 'Show Segments' },
+            { id: 'customSegments', label: 'Custom Segments' }
+        ];
+
+        modes.forEach(mode => {
+            const modeContainer = L.DomUtil.create('div', '', this._modeDiv);
+            const modeRadio = L.DomUtil.create('input', '', modeContainer);
+            modeRadio.type = 'radio';
+            modeRadio.name = 'displayMode';
+            modeRadio.id = mode.id;
+            modeRadio.style.marginRight = '5px';
+
+            if (mode.id === 'elevationOnly') {
+                modeRadio.checked = true; // Default mode
+            }
+
+            const modeLabel = L.DomUtil.create('label', '', modeContainer);
+            modeLabel.htmlFor = mode.id;
+            modeLabel.innerText = mode.label;
+        });
+
+        // Add event listener for mode change
+        this._modeDiv.addEventListener('change', (event) => {
+            this._applyModeSelection()
+        });
+
+        // Create a div to hold the buttons
+        this._buttonContainer = L.DomUtil.create('div', 'button-container', controlContainer);
+        this._buttonContainer.style.display = 'none'; // Initially hidden
+        this._buttonContainer.style.width = '100%'; // Full width
+        this._buttonContainer.style.display = 'flex';
+        this._buttonContainer.style.justifyContent = 'center'; // Center buttons horizontally
+        this._buttonContainer.style.gap = '10px'; // Add spacing between buttons
 
         // Checkbox for Move Segments
-        const moveDiv = L.DomUtil.create('div', '', controlContainer);
+        const moveDiv = L.DomUtil.create('div', '', this._buttonContainer);
         moveDiv.style.display = 'flex';
         moveDiv.style.alignItems = 'center';
         const moveSectionsCheckbox = L.DomUtil.create('input', '', moveDiv);
@@ -233,43 +259,45 @@ L.Control.Elevation = L.Control.extend({
         moveSectionsLabel.style.marginLeft = '5px';
 
         // Clear Segments Button
-        const clearButton = L.DomUtil.create('button', '', controlContainer);
-        clearButton.innerHTML = 'Clear Segments';
-        clearButton.onclick = () => {
-            this._sections = [];
-            this._updateSections();
+        this._clearButton = L.DomUtil.create('button', '', this._buttonContainer);
+        this._clearButton.innerHTML = 'Reset Segments';
+        this._clearButton.onclick = () => {
+            this._applyCurrentSegmentPlan();
         };
 
-        // Print Segments Button
-        const printSegmentsButton = L.DomUtil.create('button', '', controlContainer);
-        printSegmentsButton.innerHTML = 'Submit New Segments';
-        printSegmentsButton.onclick = () => {
+        // Submit Segments Button
+        this._printSegmentsButton = L.DomUtil.create('button', '', this._buttonContainer);
+        this._printSegmentsButton.innerHTML = 'Submit New Segments';
+        this._printSegmentsButton.onclick = () => {
+            // Existing logic for submitting segments
             const allPoints = [
                 { dist: 0 },
                 ...this._sections,
                 { dist: this._x.invert(this._width()) }
             ];
-            const segmentStartDistances = allPoints.map(point => parseFloat((point.dist / 1.60934).toFixed(3)));
-            const segmentLengths = JSON.parse(sessionStorage.getItem("segmentLengths"));
+            const unitSelect = document.getElementById('unit-select');
+            const unit = unitSelect && unitSelect.value === "imperial" ? "imperial" : "metric";
 
+            const segmentStartDistances = allPoints.map(point => {
+                const distance = unit === "imperial" ? point.dist : point.dist / 1.60934; // Convert to miles if imperial
+                return parseFloat(distance.toFixed(3)); // Round to 3 decimal places
+            });
+
+            const segmentLengths = JSON.parse(sessionStorage.getItem("segmentLengths"));
             if (!segmentLengths) {
                 console.error("Missing required information in sessionStorage.");
                 return;
             }
 
-            // Calculate cumulative distances for each point in the segmentLengths array
             const cumulativeDistances = segmentLengths.reduce((acc, length) => {
                 acc.push((acc.length > 0 ? acc[acc.length - 1] : 0) + length);
                 return acc;
             }, []);
 
-            // Find the indices of the closest points to the segment start distances
             const segmentStartIndices = segmentStartDistances.map((startDist, index) => {
                 if (index === segmentStartDistances.length - 1) {
-                    // Set the last index to be the length of segmentLengths
                     return segmentLengths.length;
                 }
-
                 let closestIndex = 0;
                 let minDifference = Infinity;
 
@@ -280,14 +308,10 @@ L.Control.Elevation = L.Control.extend({
                         closestIndex = idx;
                     }
                 });
-
                 return closestIndex;
             });
 
-            // Set custom segments
             sessionStorage.setItem("customSegments", JSON.stringify(segmentStartIndices));
-
-            // Change segmenting method to custom
             const segmentSelectWidget = document.getElementById('segment-select-widget');
             if (segmentSelectWidget) {
                 segmentSelectWidget.value = 'CUSTOM';
@@ -295,18 +319,9 @@ L.Control.Elevation = L.Control.extend({
             }
         };
 
-
-        // Add event listeners for checkboxes
-        paceCheckbox.addEventListener('change', () => {
-            if (paceCheckbox.checked) {
-                this._showPaceMarkers();
-            } else {
-                this._hidePaceMarkers();
-            }
-        });
-
         moveSectionsCheckbox.addEventListener('change', () => {
             this._moveSectionsMode = moveSectionsCheckbox.checked;
+            console.log("Move Sections Mode:", this._moveSectionsMode);
         });
 
         L.DomEvent.disableClickPropagation(container); // Prevents dragging of underlying map
@@ -319,64 +334,11 @@ L.Control.Elevation = L.Control.extend({
 
         if (this._data) {
             this._applyData();
+            this._applyCurrentSegmentPlan();
         }
 
         this._moveSectionsMode = false;
         this._draggedSection = null;
-
-        background.on("click", (event) => {
-            if (!this._moveSectionsMode) {
-                this._createSection(d3.mouse(g.node()));
-            }
-        });
-
-        background.on("mousedown", (event) => {
-            if (this._moveSectionsMode) {
-                const mouseCoords = d3.mouse(g.node());
-                const nearestSection = this._sections.find(section =>
-                    Math.abs(section.x - mouseCoords[0]) < 10
-                );
-
-                if (nearestSection) {
-                    this._draggedSection = nearestSection;
-                }
-            }
-        });
-
-        // Shift click deletes line
-        background.on("click", (event) => {
-            if (d3.event.shiftKey) {
-                const mouseCoords = d3.mouse(g.node());
-
-                const nearestSectionIndex = this._sections.findIndex(section =>
-                    Math.abs(section.x - mouseCoords[0]) < 10
-                );
-
-                if (nearestSectionIndex !== -1) {
-                    this._sections.splice(nearestSectionIndex, 1);
-                    this._updateSections();
-                }
-            } else if (!this._moveSectionsMode) {
-                this._createSection(d3.mouse(g.node()));
-            }
-        });
-
-        background.on("mousemove", (event) => {
-            if (this._moveSectionsMode && this._draggedSection) {
-                const mouseCoords = d3.mouse(g.node());
-
-                this._draggedSection.x = mouseCoords[0];
-                this._draggedSection.dist = this._x.invert(mouseCoords[0]);
-
-                this._sections.sort((a, b) => a.x - b.x);
-
-                this._updateSections();
-            }
-        });
-
-        background.on("mouseup", (event) => {
-            this._draggedSection = null;
-        });
 
         var focusG = this._focusG = g.append("g");
         this._mousefocus = focusG.append('svg:line')
@@ -396,12 +358,16 @@ L.Control.Elevation = L.Control.extend({
         this._paceLabel = focusG.append("svg:text")
             .style("pointer-events", "none")
             .attr("class", "pace-label");
+
         if (this._data) {
             this._applyData();
+            this._applyCurrentSegmentPlan();
         }
 
         background.on("mousemove.focus", this._mousemoveHandler.bind(this))
             .on("mouseout.focus", this._mouseoutHandler.bind(this));
+
+        this._applyModeSelection();
 
         return container;
     },
@@ -626,32 +592,51 @@ L.Control.Elevation = L.Control.extend({
     },
 
     _appendYaxis: function (y) {
+        // Determine the current unit from the unit-select element
+        const unitSelect = document.getElementById("unit-select");
+        const currentUnit = unitSelect ? unitSelect.value : "metric"; // Default to metric
+        const yAxisLabel = currentUnit === "imperial" ? "ft" : "m";
+
         y.attr("class", "y axis")
             .call(d3.svg.axis()
                 .scale(this._y)
                 .ticks(this.options.yTicks)
                 .orient("left"))
             .append("text")
-            .attr("x", -45)
-            .attr("y", 3)
+            .attr("x", -10)
+            .attr("y", -5)
             .style("text-anchor", "end")
-            .text("m");
+            .text(yAxisLabel);
     },
+
     _appendYaxis2: function (y) {
+        // Determine the current unit from the unit-select element
+        const unitSelect = document.getElementById("unit-select");
+        const currentUnit = unitSelect ? unitSelect.value : "metric"; // Default to metric
+        const y2AxisLabel = currentUnit === "imperial" ? "mi/min" : "km/min";
+
         y.attr("class", "y axis")
             .attr("transform", "translate(" + this._width() + " ,0)")
             .call(d3.svg.axis()
                 .scale(this._y2)
                 .ticks(this.options.yTicks)
-                .orient("right"))
+                .orient("right")
+                .tickFormat((d) => {
+                    return this._formatTime(d); // Format pace as HH:MM:SS
+                }))
             .append("text")
             .attr("x", 40)
-            .attr("y", -1)
+            .attr("y", -5) // Adjusted to move the label upward
             .style("text-anchor", "end")
-            .text("mi/min");
+            .text(y2AxisLabel);
     },
 
     _appendXaxis: function (x) {
+        // Determine the current unit from the unit-select element
+        const unitSelect = document.getElementById("unit-select");
+        const currentUnit = unitSelect ? unitSelect.value : "metric"; // Default to metric
+        const xAxisLabel = currentUnit === "imperial" ? "mi" : "km";
+
         x.attr("class", "x axis")
             .attr("transform", "translate(0," + this._height() + ")")
             .call(d3.svg.axis()
@@ -662,7 +647,7 @@ L.Control.Elevation = L.Control.extend({
             .attr("x", this._width() + 20)
             .attr("y", 15)
             .style("text-anchor", "end")
-            .text("km");
+            .text(xAxisLabel);
     },
 
     _updateAxis: function () {
@@ -770,10 +755,18 @@ L.Control.Elevation = L.Control.extend({
             this._pointG.attr("transform", "translate(" + layerpoint.x + "," + layerpoint.y + ")")
                 .style("visibility", "visible");
 
-            this._mouseHeightFocusLabel.attr("x", layerpoint.x)
-                .attr("y", normalizedY)
-                .text(item.pace.toFixed(2) + " min/mi")
+            const unitSelect = document.getElementById("unit-select");
+            const currentUnit = unitSelect ? unitSelect.value : "metric"; // Default to metric
+            const label = currentUnit === "imperial" ? "min/mi" : "min/km";
+
+            const offsetX = 10; // Adjust this value to move text horizontally
+            const offsetY = -5; // Adjust this value to move text vertically
+
+            this._mouseHeightFocusLabel.attr("x", layerpoint.x + offsetX) // Move slightly to the right
+                .attr("y", normalizedY + offsetY) // Move slightly above the label
+                .text(this._formatTime(item.pace) + ' ' + label)
                 .style("visibility", "visible");
+
 
         } else {
 
@@ -799,15 +792,26 @@ L.Control.Elevation = L.Control.extend({
             var data = this._data || [];
             var dist = this._dist || 0;
             var ele = this._maxElevation || 0;
+
+            // Determine the current unit
+            const unitSelect = document.getElementById('unit-select');
+            const unit = unitSelect && unitSelect.value === "imperial" ? "imperial" : "metric";
+
             for (var i = 0; i < coords.length; i++) {
                 var s = new L.LatLng(coords[i][1], coords[i][0]);
                 var e = new L.LatLng(coords[i ? i - 1 : 0][1], coords[i ? i - 1 : 0][0]);
                 var newdist = s.distanceTo(e);
-                dist = dist + Math.round(newdist / 1000 * 100000) / 100000;
-                ele = ele < coords[i][2] ? coords[i][2] : ele;
+
+                dist += Math.round(newdist / 1000 * 100000) / 100000; // Distance in km
+                ele = Math.max(ele, coords[i][2]); // Maximum elevation in meters
+
+                // Convert units if needed
+                var convertedDist = unit === "imperial" ? dist / 1.60934 : dist; // km to mi
+                var convertedAlt = unit === "imperial" ? coords[i][2] * 3.28084 : coords[i][2]; // m to ft
+
                 data.push({
-                    dist: dist,
-                    altitude: coords[i][2],
+                    dist: convertedDist,
+                    altitude: convertedAlt,
                     x: coords[i][0],
                     y: coords[i][1],
                     latlng: s
@@ -815,7 +819,7 @@ L.Control.Elevation = L.Control.extend({
             }
             this._dist = dist;
             this._data = data;
-            this._maxElevation = ele;
+            this._maxElevation = unit === "imperial" ? ele * 3.28084 : ele; // Update max elevation
         }
     },
 
@@ -824,44 +828,63 @@ L.Control.Elevation = L.Control.extend({
             var data = this._data || [];
             var dist = this._dist || 0;
             var ele = this._maxElevation || 0;
+
+            // Determine the current unit
+            const unitSelect = document.getElementById('unit-select');
+            const unit = unitSelect && unitSelect.value === "imperial" ? "imperial" : "metric";
+
             for (var i = 0; i < coords.length; i++) {
                 var s = new L.LatLng(coords[i][1], coords[i][0]);
                 var e = new L.LatLng(coords[i ? i - 1 : 0][1], coords[i ? i - 1 : 0][0]);
                 var newdist = s.distanceTo(e);
-                dist = dist + Math.round(newdist / 1000 * 100000) / 100000;
-                ele = ele < coords[i][2] ? coords[i][2] : ele;
+
+                dist += Math.round(newdist / 1000 * 100000) / 100000; // Distance in km
+                ele = Math.max(ele, coords[i][2]); // Maximum elevation in meters
+
+                // Convert units if needed
+                var convertedDist = unit === "imperial" ? dist / 1.60934 : dist; // km to mi
+                var convertedAlt = unit === "imperial" ? coords[i][2] * 3.28084 : coords[i][2]; // m to ft
+
                 data.push({
-                    dist: dist,
-                    altitude: coords[i][2],
+                    dist: convertedDist,
+                    altitude: convertedAlt,
+                    pace: p,
                     x: coords[i][0],
                     y: coords[i][1],
-                    latlng: s,
-                    pace: p
+                    latlng: s
                 });
             }
             this._dist = dist;
             this._data = data;
-            this._maxElevation = ele;
+            this._maxElevation = unit === "imperial" ? ele * 3.28084 : ele; // Update max elevation
         }
     },
 
-    /*
-     * Parsing function for GPX data as used by https://github.com/mpetazzoni/leaflet-gpx
-     */
     _addGPXdata: function (coords) {
         if (coords) {
             var data = this._data || [];
             var dist = this._dist || 0;
             var ele = this._maxElevation || 0;
+
+            // Determine the current unit
+            const unitSelect = document.getElementById('unit-select');
+            const unit = unitSelect && unitSelect.value === "imperial" ? "imperial" : "metric";
+
             for (var i = 0; i < coords.length; i++) {
                 var s = coords[i];
                 var e = coords[i ? i - 1 : 0];
                 var newdist = s.distanceTo(e);
-                dist = dist + Math.round(newdist / 1000 * 100000) / 100000;
-                ele = ele < s.meta.ele ? s.meta.ele : ele;
+
+                dist += Math.round(newdist / 1000 * 100000) / 100000; // Distance in km
+                ele = Math.max(ele, s.meta.ele); // Maximum elevation in meters
+
+                // Convert units if needed
+                var convertedDist = unit === "imperial" ? dist / 1.60934 : dist; // km to mi
+                var convertedAlt = unit === "imperial" ? s.meta.ele * 3.28084 : s.meta.ele; // m to ft
+
                 data.push({
-                    dist: dist,
-                    altitude: s.meta.ele,
+                    dist: convertedDist,
+                    altitude: convertedAlt,
                     x: s.lng,
                     y: s.lat,
                     latlng: s
@@ -869,91 +892,100 @@ L.Control.Elevation = L.Control.extend({
             }
             this._dist = dist;
             this._data = data;
-            this._maxElevation = ele;
+            this._maxElevation = unit === "imperial" ? ele * 3.28084 : ele; // Update max elevation
         }
     },
+
     _addGPXdataPace: function (coords, p) {
         if (coords) {
             var data = this._data || [];
             var dist = this._dist || 0;
             var ele = this._maxElevation || 0;
+
+            // Determine the current unit
+            const unitSelect = document.getElementById('unit-select');
+            const unit = unitSelect && unitSelect.value === "imperial" ? "imperial" : "metric";
+
             for (var i = 0; i < coords.length; i++) {
                 var s = coords[i];
                 var e = coords[i ? i - 1 : 0];
                 var newdist = s.distanceTo(e);
-                dist = dist + Math.round(newdist / 1000 * 100000) / 100000;
-                ele = ele < s.meta.ele ? s.meta.ele : ele;
+
+                dist += Math.round(newdist / 1000 * 100000) / 100000; // Distance in km
+                ele = Math.max(ele, s.meta.ele); // Maximum elevation in meters
+
+                // Convert units if needed
+                var convertedDist = unit === "imperial" ? dist / 1.60934 : dist; // km to mi
+                var convertedAlt = unit === "imperial" ? s.meta.ele * 3.28084 : s.meta.ele; // m to ft
+
                 data.push({
-                    dist: dist,
-                    altitude: s.meta.ele,
+                    dist: convertedDist,
+                    altitude: convertedAlt,
+                    pace: p,
                     x: s.lng,
                     y: s.lat,
-                    latlng: s,
-                    pace: p
+                    latlng: s
                 });
             }
             this._dist = dist;
             this._data = data;
-            this._maxElevation = ele;
+            this._maxElevation = unit === "imperial" ? ele * 3.28084 : ele; // Update max elevation
         }
     },
 
     _addData: function (d) {
         var geom = d && d.geometry && d.geometry;
         var i;
-        //console.log(d)
+
+        // Get the current unit from the 'unit-select' element
+        const unitSelect = document.getElementById("unit-select");
+        const currentUnit = unitSelect ? unitSelect.value : "metric"; // Default to metric if not found
+        const isImperial = currentUnit === "imperial";
+
         if (geom && d.properties.pace !== undefined) {
+            // Convert pace depending on the unit
+            const convertedPace = isImperial
+                ? d.properties.pace // Convert min/km to min/mi for imperial
+                : d.properties.pace / 1.60934; // Convert min/mi to min/km for metric
+
             switch (geom.type) {
-                case 'LineString':
+                case "LineString":
                     var data = this._data || [];
                     const start = data.length;
                     this._segmentIndex.push(start);
-                    //console.log(d.properties.pace);
-                    this._allPaces.push(d.properties.pace);
-                    this._addGeoJSONDataPace(geom.coordinates, d.properties.pace);
+                    this._allPaces.push(convertedPace);
+                    this._addGeoJSONDataPace(geom.coordinates, convertedPace);
                     break;
 
-                case 'MultiLineString':
+                case "MultiLineString":
                     for (i = 0; i < geom.coordinates.length; i++) {
                         var data = this._data || [];
                         const start = data.length;
                         this._segmentIndex.push(start);
-                        this._allPaces.push(d.properties.pace);
-                        this._addGeoJSONDataPace(geom.coordinates[i], d.properties.pace);
+
+                        this._allPaces.push(convertedPace);
+                        this._addGeoJSONDataPace(geom.coordinates[i], convertedPace);
                     }
                     break;
 
                 default:
-                    throw new Error('Invalid GeoJSON object.');
+                    throw new Error("Invalid GeoJSON object.");
             }
         } else if (geom) {
             switch (geom.type) {
-                case 'LineString':
+                case "LineString":
                     this._addGeoJSONData(geom.coordinates);
                     break;
 
-                case 'MultiLineString':
+                case "MultiLineString":
                     for (i = 0; i < geom.coordinates.length; i++) {
                         this._addGeoJSONData(geom.coordinates[i]);
                     }
                     break;
 
                 default:
-                    throw new Error('Invalid GeoJSON object.');
+                    throw new Error("Invalid GeoJSON object.");
             }
-        }
-
-        var feat = d && d.type === "FeatureCollection";
-        if (feat) {
-            for (i = 0; i < d.features.length; i++) {
-                this._addData(d.features[i]);
-            }
-        }
-        if (d && d._latlngs && d.type == "Feature" && d.properties.pace !== undefined) {
-            this._addGPXdataPace(d._latlngs, d.properties.pace);
-
-        } else if (d && d._latlngs) {
-            this._addGPXdata(d._latlngs);
         }
     },
 
@@ -984,6 +1016,7 @@ L.Control.Elevation = L.Control.extend({
         this._addData(d);
         if (this._container) {
             this._applyData();
+            this._applyCurrentSegmentPlan();
         }
         if (layer === null && d.on) {
             layer = d;
@@ -1095,39 +1128,66 @@ L.Control.Elevation = L.Control.extend({
 
     _showDiagramIndicator: function (item, xCoordinate) {
         var opts = this.options;
+
+        // Get the current unit from the unit-select element
+        const unitSelect = document.getElementById('unit-select');
+        const unit = unitSelect && unitSelect.value === "imperial" ? "imperial" : "metric";
+
+        // Set visibility for the focus group
         this._focusG.style("visibility", "visible");
+
+        // Update the vertical cursor line position
         this._mousefocus.attr('x1', xCoordinate)
             .attr('y1', 0)
             .attr('x2', xCoordinate)
             .attr('y2', this._height())
             .classed('hidden', false);
 
-        var alt = item.altitude,
-            dist = item.dist,
-            ll = item.latlng,
-            numY = opts.hoverNumber.formatter(alt, opts.hoverNumber.decimalsY),
-            numX = opts.hoverNumber.formatter(dist, opts.hoverNumber.decimalsX);
+        // Get and format the values based on the unit
+        const altitude = item.altitude.toFixed(1); // Convert to feet if imperial
+        const distance = item.dist.toFixed(2); // Convert to miles if imperial
+        const pace = this._formatTime(item.pace);
 
+        // Update labels with the proper units
         this._focuslabelX.attr("x", xCoordinate)
-            .text(numY + " m");
+            .text(`${altitude} ${unit === "imperial" ? "ft" : "m"}`);
+
         this._focuslabelY.attr("y", this._height() - 5)
             .attr("x", xCoordinate)
-            .text(numX + " km");
+            .text(`${distance} ${unit === "imperial" ? "mi" : "km"}`);
+
         this._paceLabel.attr("y", this._height() - 65)
             .attr("x", xCoordinate)
-            .text(item.pace.toFixed(2) + " min/mi");
+            .text(`${pace} ${unit === "imperial" ? "min/mi" : "min/km"}`);
     },
 
     _applyData: function () {
-        var xdomain = d3.extent(this._data, function (d) {
+        const xdomain = d3.extent(this._data, function (d) {
             return d.dist;
         });
-        var ydomain = d3.extent(this._data, function (d) {
+
+        const ydomain = d3.extent(this._data, function (d) {
             return d.altitude;
         });
-        var pacedomain = d3.extent(this._allPaces);
-        var opts = this.options;
 
+        let pacedomain = d3.extent(this._allPaces);
+        const opts = this.options;
+
+        // Define a minimum range for the pace axis
+        const minPaceRange = 0.75; // Minimum range in pace units (e.g., min/km or min/mi)
+
+        // If the range is too small, adjust it
+        if (pacedomain[1] - pacedomain[0] < minPaceRange) {
+            const center = (pacedomain[0] + pacedomain[1]) / 2;
+            pacedomain = [center - minPaceRange / 2, center + minPaceRange / 2];
+        }
+
+        // Add padding around the pace values
+        const pacePadding = (pacedomain[1] - pacedomain[0]) * 0.025; // 10% padding
+        pacedomain[0] -= pacePadding;
+        pacedomain[1] += pacePadding;
+
+        // Adjust elevation axis domain
         if (opts.yAxisMin !== undefined && (opts.yAxisMin < ydomain[0] || opts.forceAxisBounds)) {
             ydomain[0] = opts.yAxisMin;
         }
@@ -1135,13 +1195,19 @@ L.Control.Elevation = L.Control.extend({
             ydomain[1] = opts.yAxisMax;
         }
 
+        // Update the scales
         this._x.domain(xdomain);
         this._y2.domain(pacedomain);
         this._y.domain(ydomain);
+
+        // Apply the data to the area path
         this._areapath.datum(this._data)
             .attr("d", this._area);
+
+        // Update the axes
         this._updateAxis();
 
+        // Update the full extent for the map
         this._fullExtent = this._calculateFullExtent(this._data);
     },
 
@@ -1173,6 +1239,218 @@ L.Control.Elevation = L.Control.extend({
         this._x.domain([0, 1]);
         this._y.domain([0, 1]);
         this._updateAxis();
+    },
+
+    _formatTime: function (minutes) {
+        const totalSeconds = Math.floor(minutes * 60);
+        const hours = Math.floor(totalSeconds / 3600);
+        const minutesPart = Math.floor((totalSeconds % 3600) / 60);
+        const seconds = totalSeconds % 60;
+
+        if (hours === 0) {
+            return `${minutesPart}:${String(seconds).padStart(2, '0')}`;
+        } else {
+            return `${hours}:${String(minutesPart).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+        }
+    },
+
+    _applyCurrentSegmentPlan: function () {
+        // Retrieve the segment indices from sessionStorage
+        const segments = JSON.parse(sessionStorage.getItem("segments"));
+
+        if (!segments || segments.length < 2) {
+            console.error("Segment data is missing or insufficient in sessionStorage.");
+            return;
+        }
+
+        // Clear the existing sections
+        this._sections = [];
+        this._updateSections();
+
+        // Exclude the first and last segment indices
+        const segmentBoundaries = segments.slice(1, -1); // Remove the first and last indices
+
+        // Calculate and apply sections based on the filtered segment indices
+        segmentBoundaries.forEach(segmentIndex => {
+            if (segmentIndex < 0 || segmentIndex >= this._data.length) {
+                return;
+            }
+
+            // Calculate the x-coordinate on the graph
+            const segmentData = this._data[segmentIndex];
+            const xCoord = this._x(segmentData.dist); // Convert distance to x-pixel coordinate
+            const yCoord = this._y(segmentData.altitude); // Convert altitude to y-pixel coordinate
+
+            // Create the section on the graph
+            this._createSection([xCoord, yCoord]);
+        });
+
+        this._applyModeSelection();
+    },
+
+    _hideSegmentsAndPaces: function () {
+        // Clear segments and paces
+        this._sectionsGroup.selectAll("*").remove();
+        this._verticalLinesGroup.selectAll("*").remove();
+        this._hidePaceMarkers(); // Use existing method to hide paces
+        this._moveSectionsMode = false;
+    },
+
+    _showSegmentsAndPaces: function () {
+        // Clear existing elements
+        this._sectionsGroup.selectAll("*").remove();
+        this._verticalLinesGroup.selectAll("*").remove();
+
+        if (this._data && this._data.length > 0 && this._sections.length > 0) {
+            const fullSections = [
+                { x: 0, dist: this._x.invert(0) },
+                ...this._sections.map(section => ({
+                    x: section.x,
+                    dist: this._x.invert(section.x),
+                })),
+                { x: this._width(), dist: this._x.invert(this._width()) }
+            ];
+
+            // Iterate over each segment
+            for (let i = 0; i < fullSections.length - 1; i++) {
+                const colorIndex = i % this._sectionColors.length;
+
+                // Start and end points for the current segment
+                const startX = fullSections[i].x;
+                const endX = fullSections[i + 1].x;
+
+                // Find the closest data point index for the start of the segment
+                const startIndex = this._segmentIndex[i];
+                const endIndex = this._segmentIndex[i + 1] || this._data.length - 1;
+
+                // Determine the pace (height) for the current segment
+                const segmentPace = this._data[startIndex]?.pace || 0; // Default to 0 if undefined
+                const yPace = this._y2(segmentPace); // Convert pace to y-coordinate
+                const rectHeight = this._height() - yPace; // Height from the pace to the bottom
+
+                // Draw the single rectangle for the segment
+                this._sectionsGroup.append("rect")
+                    .attr("x", startX)
+                    .attr("y", yPace) // Start at the pace height
+                    .attr("width", endX - startX) // Width of the segment
+                    .attr("height", rectHeight) // Height from pace to the bottom
+                    .style("fill", this._sectionColors[colorIndex]) // Fill with section color
+                    .style("stroke", "black") // Black border
+                    .style("stroke-width", 2)
+                    .style("pointer-events", "none");
+            }
+        }
+
+        this._moveSectionsMode = false; // Disable section editing mode
+    },
+
+    _findClosestIndex: function (distance) {
+        // Find the index of the data point closest to the given distance
+        let closestIndex = 0;
+        let minDifference = Infinity;
+
+        this._data.forEach((point, index) => {
+            const difference = Math.abs(point.dist - distance);
+            if (difference < minDifference) {
+                minDifference = difference;
+                closestIndex = index;
+            }
+        });
+
+        return closestIndex;
+    },
+
+    _enableCustomSegments: function () {
+        // Allow editing of segments
+        this._updateSections(); // Show existing segments
+        this._hidePaceMarkers(); // Use existing method to hide paces
+
+        this._background.on("click", (event) => {
+            const mouseCoords = d3.mouse(this._background.node());
+            console.log("Move sections mode:", this._moveSectionsMode);
+            if (d3.event.shiftKey) {
+                const nearestSectionIndex = this._sections.findIndex(section =>
+                    Math.abs(section.x - mouseCoords[0]) < 10
+                );
+
+                if (nearestSectionIndex !== -1) {
+                    this._sections.splice(nearestSectionIndex, 1);
+                    this._updateSections();
+                }
+            } else if (!this._moveSectionsMode) {
+                this._createSection(mouseCoords);
+            }
+        });
+
+        this._background.on("mousedown", (event) => {
+            if (this._moveSectionsMode) {
+                const mouseCoords = d3.mouse(this._background.node());
+                const nearestSection = this._sections.find(section =>
+                    Math.abs(section.x - mouseCoords[0]) < 10
+                );
+
+                if (nearestSection) {
+                    this._draggedSection = nearestSection;
+                }
+            }
+        });
+
+        this._background.on("mousemove", (event) => {
+            if (this._moveSectionsMode && this._draggedSection) {
+                const mouseCoords = d3.mouse(this._background.node());
+
+                this._draggedSection.x = mouseCoords[0];
+                this._draggedSection.dist = this._x.invert(mouseCoords[0]);
+
+                this._sections.sort((a, b) => a.x - b.x);
+
+                this._updateSections();
+            }
+        });
+
+        this._background.on("mouseup", (event) => {
+            this._draggedSection = null;
+        });
+
+    },
+
+    _applyModeSelection: function () {
+        const modeDiv = this._modeDiv;
+        if (!modeDiv) {
+            console.error('ModeDiv not found');
+            return;
+        }
+
+        const selectedMode = modeDiv.querySelector('input[name="displayMode"]:checked');
+        if (!selectedMode) {
+            console.error('No mode selected. Defaulting to elevation only.');
+            this._hideSegmentsAndPaces();
+            return;
+        }
+
+        // Access buttons and container using `this`
+        const buttonContainer = this._buttonContainer;
+
+        // Apply behavior based on the selected mode
+        switch (selectedMode.id) {
+            case 'elevationOnly':
+                this._hideSegmentsAndPaces();
+                buttonContainer.style.display = 'none';
+                break;
+            case 'showSegments':
+                this._showSegmentsAndPaces();
+                buttonContainer.style.display = 'none';
+                break;
+            case 'customSegments':
+                this._enableCustomSegments();
+                buttonContainer.style.display = 'flex';
+                console.log('Custom segments enabled.');
+                break;
+            default:
+                console.error('Invalid mode selected. Defaulting to elevation only.');
+                this._hideSegmentsAndPaces();
+                buttonContainer.style.display = 'none';
+        }
     }
 
 });

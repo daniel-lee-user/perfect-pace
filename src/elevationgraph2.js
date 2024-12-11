@@ -122,6 +122,19 @@ L.Control.Elevation = L.Control.extend({
             this._sectionsGroup.selectAll("*").remove();
             this._verticalLinesGroup.selectAll("*").remove();
 
+            // Check if there are sections, otherwise create a default full-course section
+            const fullSections = this._sections.length > 0
+                ? [
+                    { x: 0, y: 0, dist: this._x.invert(0), altitude: this._y.invert(0) },
+                    ...this._sections,
+                    { x: this._width(), y: 0, dist: this._x.invert(this._width()), altitude: this._y.invert(0) }
+                ]
+                : [
+                    { x: 0, y: 0, dist: this._x.invert(0), altitude: this._y.invert(0) },
+                    { x: this._width(), y: 0, dist: this._x.invert(this._width()), altitude: this._y.invert(0) }
+                ];
+
+            // Add vertical lines
             this._verticalLinesGroup.selectAll(".vertical-line")
                 .data(this._sections)
                 .enter()
@@ -134,49 +147,18 @@ L.Control.Elevation = L.Control.extend({
                 .style("stroke", "#000")
                 .style("stroke-width", 2);
 
-            // Only create shaded sections if user has created sections
-            if (this._sections.length > 0) {
-                let fullSections = [
-                    {
-                        x: 0,
-                        y: 0,
-                        dist: this._x.invert(0),
-                        altitude: this._y.invert(0)
-                    },
-                    ...this._sections,
-                    {
-                        x: this._width(),
-                        y: 0,
-                        dist: this._x.invert(this._width()),
-                        altitude: this._y.invert(0)
-                    }
-                ];
+            // Create shaded sections
+            for (let i = 0; i < fullSections.length - 1; i++) {
+                const colorIndex = i % this._sectionColors.length;
 
-                for (let i = 0; i < fullSections.length - 1; i++) {
-                    const colorIndex = i % this._sectionColors.length;
-
-                    this._sectionsGroup.append("rect")
-                        .attr("x", fullSections[i].x)
-                        .attr("y", 0)
-                        .attr("width", fullSections[i + 1].x - fullSections[i].x)
-                        .attr("height", this._height())
-                        .style("fill", this._sectionColors[colorIndex])
-                        .style("pointer-events", "none");
-                }
+                this._sectionsGroup.append("rect")
+                    .attr("x", fullSections[i].x)
+                    .attr("y", 0)
+                    .attr("width", fullSections[i + 1].x - fullSections[i].x)
+                    .attr("height", this._height())
+                    .style("fill", this._sectionColors[colorIndex])
+                    .style("pointer-events", "none");
             }
-
-            this._verticalLinesGroup.selectAll(".section-label")
-                .data(this._sections.length > 0 ?
-                    [{ x: 0, index: 0 }].concat(this._sections.map((d, i) => ({ x: d.x, index: i + 1 }))) :
-                    [])
-                .enter()
-            // .append("text")
-            // .attr("class", "section-label")
-            // .attr("x", d => d.x + 5)
-            // .attr("y", 15)
-            // .text(d => `Segment ${d.index + 1}`)
-            // .style("font-size", "12px")
-            // .style("fill", "#000");
         };
 
         if (L.Browser.touch) {
@@ -224,8 +206,9 @@ L.Control.Elevation = L.Control.extend({
             modeRadio.id = mode.id;
             modeRadio.style.marginRight = '5px';
 
-            if (mode.id === 'elevationOnly') {
-                modeRadio.checked = true; // Default mode
+            const submittingSegments = sessionStorage.getItem("submittingSegments") === "true";
+            if (mode.id === 'customSegments' && submittingSegments === true || mode.id === 'elevationOnly') {
+                modeRadio.checked = true;
             }
 
             const modeLabel = L.DomUtil.create('label', '', modeContainer);
@@ -268,7 +251,9 @@ L.Control.Elevation = L.Control.extend({
         // Submit Segments Button
         this._printSegmentsButton = L.DomUtil.create('button', '', this._buttonContainer);
         this._printSegmentsButton.innerHTML = 'Submit New Segments';
+        sessionStorage.setItem("submittingSegments", false);
         this._printSegmentsButton.onclick = () => {
+            sessionStorage.setItem("submittingSegments", true);
             // Existing logic for submitting segments
             const allPoints = [
                 { dist: 0 },
@@ -334,7 +319,6 @@ L.Control.Elevation = L.Control.extend({
 
         moveSectionsCheckbox.addEventListener('change', () => {
             this._moveSectionsMode = moveSectionsCheckbox.checked;
-            console.log("Move Sections Mode:", this._moveSectionsMode);
         });
 
         L.DomEvent.disableClickPropagation(container); // Prevents dragging of underlying map
@@ -1070,7 +1054,6 @@ L.Control.Elevation = L.Control.extend({
     },
 
     _handleLayerMouseOut: function (evt) {
-        //console.log("OUt");
         if (this._pointM) {
             this._pointM.style("visibility", "hidden");
         }
@@ -1084,7 +1067,6 @@ L.Control.Elevation = L.Control.extend({
         }
         var g = d3.select(this._container).select("svg").select("g");
 
-        //console.log(this._allPaces);
         this._segmentIndex.forEach((element, index) => {
             var paceGroup = g.append("g");
             if (index == this._segmentIndex.length - 1) {
@@ -1314,44 +1296,44 @@ L.Control.Elevation = L.Control.extend({
         this._sectionsGroup.selectAll("*").remove();
         this._verticalLinesGroup.selectAll("*").remove();
 
-        if (this._data && this._data.length > 0 && this._sections.length > 0) {
-            const fullSections = [
+        const fullSections = this._sections.length > 0
+            ? [
                 { x: 0, dist: this._x.invert(0) },
                 ...this._sections.map(section => ({
                     x: section.x,
                     dist: this._x.invert(section.x),
                 })),
                 { x: this._width(), dist: this._x.invert(this._width()) }
+            ]
+            : [
+                { x: 0, dist: this._x.invert(0) },
+                { x: this._width(), dist: this._x.invert(this._width()) }
             ];
 
-            // Iterate over each segment
-            for (let i = 0; i < fullSections.length - 1; i++) {
-                const colorIndex = i % this._sectionColors.length;
+        // Iterate over each segment
+        for (let i = 0; i < fullSections.length - 1; i++) {
+            const colorIndex = i % this._sectionColors.length;
 
-                // Start and end points for the current segment
-                const startX = fullSections[i].x;
-                const endX = fullSections[i + 1].x;
+            // Start and end points for the current segment
+            const startX = fullSections[i].x;
+            const endX = fullSections[i + 1].x;
 
-                // Find the closest data point index for the start of the segment
-                const startIndex = this._segmentIndex[i];
-                const endIndex = this._segmentIndex[i + 1] || this._data.length - 1;
+            // Determine the segment's pace (if available)
+            const startIndex = this._segmentIndex[i] || 0;
+            const segmentPace = this._data[startIndex]?.pace || 0; // Default to 0 if undefined
+            const yPace = this._y2(segmentPace); // Convert pace to y-coordinate
+            const rectHeight = this._height() - yPace; // Height from pace to the bottom
 
-                // Determine the pace (height) for the current segment
-                const segmentPace = this._data[startIndex]?.pace || 0; // Default to 0 if undefined
-                const yPace = this._y2(segmentPace); // Convert pace to y-coordinate
-                const rectHeight = this._height() - yPace; // Height from the pace to the bottom
-
-                // Draw the single rectangle for the segment
-                this._sectionsGroup.append("rect")
-                    .attr("x", startX)
-                    .attr("y", yPace) // Start at the pace height
-                    .attr("width", endX - startX) // Width of the segment
-                    .attr("height", rectHeight) // Height from pace to the bottom
-                    .style("fill", this._sectionColors[colorIndex]) // Fill with section color
-                    .style("stroke", "black") // Black border
-                    .style("stroke-width", 2)
-                    .style("pointer-events", "none");
-            }
+            // Draw the single rectangle for the segment
+            this._sectionsGroup.append("rect")
+                .attr("x", startX)
+                .attr("y", yPace) // Start at the pace height
+                .attr("width", endX - startX) // Width of the segment
+                .attr("height", rectHeight) // Height from pace to the bottom
+                .style("fill", this._sectionColors[colorIndex]) // Fill with section color
+                .style("stroke", "black") // Black border
+                .style("stroke-width", 2)
+                .style("pointer-events", "none");
         }
 
         this._moveSectionsMode = false; // Disable section editing mode
@@ -1380,7 +1362,6 @@ L.Control.Elevation = L.Control.extend({
 
         this._background.on("click", (event) => {
             const mouseCoords = d3.mouse(this._background.node());
-            console.log("Move sections mode:", this._moveSectionsMode);
             if (d3.event.shiftKey) {
                 const nearestSectionIndex = this._sections.findIndex(section =>
                     Math.abs(section.x - mouseCoords[0]) < 10
@@ -1461,7 +1442,6 @@ L.Control.Elevation = L.Control.extend({
                 this._enableCustomSegments();
                 buttonContainer.style.display = 'flex';
                 if (instructionsDiv) instructionsDiv.style.display = 'block';
-                console.log('Custom segments enabled.');
                 break;
             default:
                 console.error('Invalid mode selected. Defaulting to elevation only.');

@@ -20,7 +20,7 @@ PACING_PLAN_METHODS : Dict[str, PacingPlan]= {
 
 def main():
     methods = PACING_PLAN_METHODS
-    course_names = ['boston',  'wineglass', 'FH-Fox', 'scurve', 'dodge']
+    course_names = ['boston',  'wineglass', 'FH-Fox', 'scurve', 'dodge', 'Freeville-Fly-In']
     errors = ['beebe']
     total_paces = [1, 5, 10]
     # target_times = [100, ]

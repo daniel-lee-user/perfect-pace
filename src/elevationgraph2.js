@@ -194,7 +194,7 @@ L.Control.Elevation = L.Control.extend({
 
         const controlContainer = L.DomUtil.create('div', 'control-container', container);
         controlContainer.style.backgroundColor = 'white';
-        controlContainer.style.padding = '2px 5px';
+        controlContainer.style.padding = '2px 0px';
         controlContainer.style.margin = 'auto';
         controlContainer.style.width = '100%';
         controlContainer.style.display = 'flex';
@@ -318,6 +318,19 @@ L.Control.Elevation = L.Control.extend({
                 segmentSelectWidget.dispatchEvent(new Event('change'));
             }
         };
+
+        // Add instructional text under the buttons
+        const instructionsDiv = L.DomUtil.create('div', 'instructions', controlContainer);
+        instructionsDiv.style.textAlign = 'center'; // Center-align the text
+        instructionsDiv.style.marginTop = '0px'; // Reduce spacing from the buttons
+        instructionsDiv.style.fontSize = '10px'; // Make the text slightly smaller
+        instructionsDiv.style.lineHeight = '0.25'; // Adjust line height for closer text spacing
+        instructionsDiv.style.color = '#333'; // Set the text color
+        instructionsDiv.style.display = 'none'; // Hide initially
+
+        instructionsDiv.innerHTML = `
+            <p>Click to create a divider, hold <strong>shift</strong> and click to delete.</p>
+        `;
 
         moveSectionsCheckbox.addEventListener('change', () => {
             this._moveSectionsMode = moveSectionsCheckbox.checked;
@@ -1430,26 +1443,31 @@ L.Control.Elevation = L.Control.extend({
 
         // Access buttons and container using `this`
         const buttonContainer = this._buttonContainer;
+        const instructionsDiv = this._container.querySelector('.instructions');
 
         // Apply behavior based on the selected mode
         switch (selectedMode.id) {
             case 'elevationOnly':
                 this._hideSegmentsAndPaces();
                 buttonContainer.style.display = 'none';
+                if (instructionsDiv) instructionsDiv.style.display = 'none';
                 break;
             case 'showSegments':
                 this._showSegmentsAndPaces();
                 buttonContainer.style.display = 'none';
+                if (instructionsDiv) instructionsDiv.style.display = 'none';
                 break;
             case 'customSegments':
                 this._enableCustomSegments();
                 buttonContainer.style.display = 'flex';
+                if (instructionsDiv) instructionsDiv.style.display = 'block';
                 console.log('Custom segments enabled.');
                 break;
             default:
                 console.error('Invalid mode selected. Defaulting to elevation only.');
                 this._hideSegmentsAndPaces();
                 buttonContainer.style.display = 'none';
+                if (instructionsDiv) instructionsDiv.style.display = 'none';
         }
     }
 

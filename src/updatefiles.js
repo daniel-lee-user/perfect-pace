@@ -246,15 +246,15 @@ function modifyGeoJSON(geojson) {
     }
     if (("pace" in geojson.features[0].properties)) {
         const brightColors = [
-            '#FF0000', // Red (Bright)
-            '#FFFF00', // Yellow
-            '#00FF00', // Green
-            '#00FFFF', // Cyan
-            '#FF00FF', // Magenta
-            '#FFA500', // Orange
-            '#0000FF', // Blue
-            '#800080', // Purple
-            '#008000', // Dark Green (Dark)
+            'rgba(255, 0, 0, 1)',    // Red
+            'rgba(255, 255, 0, 1)',  // Yellow
+            'rgba(0, 255, 0, 1)',    // Green
+            'rgba(0, 255, 255, 1)',  // Cyan
+            'rgba(255, 0, 255, 1)',  // Magenta
+            'rgba(255, 165, 0, 1)',  // Orange
+            'rgba(0, 0, 255, 1)',    // Blue
+            'rgba(128, 0, 128, 1)',  // Purple
+            'rgba(0, 128, 0, 1)'     // Dark Green
         ];
         const paces = geojson.features.map(feature => feature.properties.pace);
 

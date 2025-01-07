@@ -35,13 +35,7 @@ L.Control.Elevation = L.Control.extend({
         var allPaces = this._allPaces = [];
         var sections = this._sections = [];
 
-        this._sectionColors = [
-            'rgba(255, 99, 132, 0.3)',  // red
-            'rgba(54, 162, 235, 0.3)',  // blue
-            'rgba(255, 206, 86, 0.3)',  // yellow
-            'rgba(75, 192, 192, 0.3)',  // green
-            'rgba(153, 102, 255, 0.3)', // purple
-        ];
+        this._sectionColors = [];
 
         var opts = this.options;
         var margin = opts.margins;
@@ -950,6 +944,9 @@ L.Control.Elevation = L.Control.extend({
                     var data = this._data || [];
                     const start = data.length;
                     this._segmentIndex.push(start);
+                    this._sectionColors.push(
+                        d.properties.color.replace(/rgba\((\d+), (\d+), (\d+), [^)]+\)/, 'rgba($1, $2, $3, 0.4)')
+                    );
                     this._allPaces.push(convertedPace);
                     this._addGeoJSONDataPace(geom.coordinates, convertedPace);
                     break;
@@ -1323,7 +1320,6 @@ L.Control.Elevation = L.Control.extend({
             const segmentPace = this._data[startIndex]?.pace || 0; // Default to 0 if undefined
             const yPace = this._y2(segmentPace); // Convert pace to y-coordinate
             const rectHeight = this._height() - yPace; // Height from pace to the bottom
-
             // Draw the single rectangle for the segment
             this._sectionsGroup.append("rect")
                 .attr("x", startX)
@@ -1372,6 +1368,10 @@ L.Control.Elevation = L.Control.extend({
                     this._updateSections();
                 }
             } else if (!this._moveSectionsMode) {
+                const randomColor = `rgba(${Math.floor(Math.random() * 256)}, ${Math.floor(Math.random() * 256)}, ${Math.floor(Math.random() * 256)}, 0.4)`;
+
+                // Push the random color with opacity 0.4 to sectionColors
+                this._sectionColors.push(randomColor);    
                 this._createSection(mouseCoords);
             }
         });

@@ -136,7 +136,7 @@ document.getElementById('submitBtn').addEventListener('click', async function (e
         alert("An error occurred while processing your request.");
     } finally {
         document.getElementById('loadingScreen').style.display = 'none';
-        fileInput.value = '';
+        //fileInput.value = '';
     }
 
     async function deleteFile(filename) {

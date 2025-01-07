@@ -944,9 +944,11 @@ L.Control.Elevation = L.Control.extend({
                     var data = this._data || [];
                     const start = data.length;
                     this._segmentIndex.push(start);
+
                     this._sectionColors.push(
                         d.properties.color.replace(/rgba\((\d+), (\d+), (\d+), [^)]+\)/, 'rgba($1, $2, $3, 0.4)')
                     );
+
                     this._allPaces.push(convertedPace);
                     this._addGeoJSONDataPace(geom.coordinates, convertedPace);
                     break;
@@ -1320,6 +1322,7 @@ L.Control.Elevation = L.Control.extend({
             const segmentPace = this._data[startIndex]?.pace || 0; // Default to 0 if undefined
             const yPace = this._y2(segmentPace); // Convert pace to y-coordinate
             const rectHeight = this._height() - yPace; // Height from pace to the bottom
+
             // Draw the single rectangle for the segment
             this._sectionsGroup.append("rect")
                 .attr("x", startX)

@@ -1,3 +1,5 @@
+import { segmentLengths } from "./reloadscript.js"
+
 L.Control.Elevation = L.Control.extend({
     options: {
         position: "topright",
@@ -262,7 +264,7 @@ L.Control.Elevation = L.Control.extend({
                 return parseFloat(distance.toFixed(3)); // Round to 3 decimal places
             });
 
-            const segmentLengths = JSON.parse(sessionStorage.getItem("segmentLengths"));
+            //const segmentLengths = JSON.parse(sessionStorage.getItem("segmentLengths"));
             if (!segmentLengths) {
                 console.error("Missing required information in sessionStorage.");
                 return;

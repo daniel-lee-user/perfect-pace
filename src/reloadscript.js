@@ -1,4 +1,9 @@
 import { updateFiles } from './updatefiles.js';
+// shared variables
+export var presetSegments;
+export var optimalPaces;
+export var segmentLengths;
+export var coordinates;
 
 // Add event listener for the segment type selection dropdown
 document.getElementById('segment-select-widget').addEventListener('change', () => {
@@ -11,7 +16,7 @@ document.getElementById('segment-select-widget').addEventListener('change', () =
     // Allow the DOM to update before starting computations
     setTimeout(() => {
         try {
-            updateFiles(); // Perform necessary calculations
+            updateFiles(presetSegments, optimalPaces, segmentLengths, coordinates); // Perform necessary calculations
 
             // Trigger map update
             if (window.myApp && typeof window.myApp.loadMapData === 'function') {
@@ -97,24 +102,25 @@ document.getElementById('submitBtn').addEventListener('click', async function (e
         }
 
         // Parse the JSON content of each file
-        const presetSegments = JSON.parse(presetSegmentsTxt);
-        const optimalPaces = JSON.parse(optimalPacesTxt);
-        const segmentLengths = JSON.parse(segmentLengthsTxt);
-        const coordinates = JSON.parse(coordinatesTxt);
+        presetSegments = JSON.parse(presetSegmentsTxt);
+        optimalPaces = JSON.parse(optimalPacesTxt);
+        segmentLengths = JSON.parse(segmentLengthsTxt);
+        coordinates = JSON.parse(coordinatesTxt);
         const courseName = fileInput.files[0].name.split('.')[0];
         const totalDistance = segmentLengths.reduce((a, b) => a + b, 0.0);
         const netElevation = coordinates[coordinates.length - 1][2] - coordinates[0][2];
 
         // Store all data in sessionStorage
+        /*
         sessionStorage.setItem('presetSegments', JSON.stringify(presetSegments));
         sessionStorage.setItem('optimalPaces', JSON.stringify(optimalPaces));
         sessionStorage.setItem('segmentLengths', JSON.stringify(segmentLengths));
         sessionStorage.setItem('coordinates', JSON.stringify(coordinates));
+        */
         sessionStorage.setItem('courseName', courseName);
         sessionStorage.setItem('targetTime', time);
         sessionStorage.setItem('totalDistance', totalDistance);
         sessionStorage.setItem('netElevation', netElevation);
-
         // Set segment method to default (Hill Detection)
         const segmentSelectWidget = document.getElementById('segment-select-widget');
         if (segmentSelectWidget) {
@@ -122,7 +128,7 @@ document.getElementById('submitBtn').addEventListener('click', async function (e
         }
 
         // Call updateFiles to generate the necessary files in sessionStorage
-        updateFiles();
+        updateFiles(presetSegments, optimalPaces, segmentLengths, coordinates);
 
         // Trigger map update
         if (window.myApp && typeof window.myApp.loadMapData === 'function') {

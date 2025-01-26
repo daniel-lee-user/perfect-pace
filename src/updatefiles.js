@@ -1,12 +1,13 @@
-export function updateFiles() {
+export var globalGeoData;
+
+export function updateFiles(presetSegments, optimalPaces, segmentLengths, coordinates) {
     // Read required information from sessionStorage
-    const presetSegments = JSON.parse(sessionStorage.getItem("presetSegments"));
-    const optimalPaces = JSON.parse(sessionStorage.getItem("optimalPaces"));
-    const segmentLengths = JSON.parse(sessionStorage.getItem("segmentLengths"));
-    const coordinates = JSON.parse(sessionStorage.getItem("coordinates"));
+    //const presetSegments = JSON.parse(sessionStorage.getItem("presetSegments"));
+    //const optimalPaces = JSON.parse(sessionStorage.getItem("optimalPaces"));
+    //const segmentLengths = JSON.parse(sessionStorage.getItem("segmentLengths"));
+    //const coordinates = JSON.parse(sessionStorage.getItem("coordinates"));
     const courseName = sessionStorage.getItem("courseName");
     const targetTime = sessionStorage.getItem("targetTime");
-
     if (!optimalPaces || !segmentLengths || !coordinates) {
         console.error("Missing required information in sessionStorage.");
         return;
@@ -289,8 +290,9 @@ function modifyGeoJSON(geojson) {
     };
 
     // Store the modified GeoJSON in local storage
-    sessionStorage.setItem('geoData', JSON.stringify(geojson));
+    // instead of using session storage to store this, export a variable
+    globalGeoData = geojson;
 }
 
 // Call the function to update files
-updateFiles();
+//updateFiles();

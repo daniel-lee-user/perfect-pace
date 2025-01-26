@@ -1,4 +1,6 @@
 // Ensure global namespace and initialize map
+import { globalGeoData } from "./updatefiles.js"
+
 window.myApp = window.myApp || {};
 window.myApp.map = null;
 window.myApp.routeLayer = null; // Placeholder for the route layer
@@ -21,7 +23,7 @@ window.addEventListener('load', () => {
 });
 
 function loadMapData() {
-    const geoData = sessionStorage.getItem('geoData');
+    const geoData = globalGeoData;
 
     // Remove existing route layer and elevation control if they exist
     if (window.myApp.routeLayer) {
@@ -38,7 +40,7 @@ function loadMapData() {
     window.myApp.markers = []; // Clear the markers array
 
     if (geoData) {
-        const geojson = JSON.parse(geoData);
+        const geojson = geoData;
 
         // Add elevation control
         const el = L.control.elevation();
@@ -105,7 +107,7 @@ function loadMapData() {
     const mileData = sessionStorage.getItem('milePaces');
     const kilometerData = sessionStorage.getItem('kilometerPaces');
 
-    if (segmentData || mileData) {
+    if ((segmentData || mileData) && geoData) {
         if (document.getElementById('segment-select').value === 'segments') {
             parseSegmentData(segmentData);
         } else {
@@ -184,6 +186,7 @@ function parseMileIndexData(jsonData) {
 
 // Helper function to format time in minutes to "HH:MM:SS"
 function formatTime(minutes) {
+    var result;
     const totalSeconds = Math.floor(minutes * 60);
     const hours = Math.floor(totalSeconds / 3600);
     const minutesPart = Math.floor((totalSeconds % 3600) / 60);

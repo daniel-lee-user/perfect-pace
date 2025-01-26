@@ -59,7 +59,7 @@ def upload_file():
         file_path = os.path.realpath(file_path)
         os.chdir("src/")
         result = subprocess.run(
-            ['python', 'segment_script.py', '-f', file_path, '-t', time, '-o', output_base_path],
+            [sys.executable, 'segment_script.py', '-f', file_path, '-t', time, '-o', output_base_path],
             capture_output=True,
             text=True
         )

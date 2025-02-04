@@ -1,4 +1,4 @@
-import { updateFiles } from './updatefiles.js';
+import { globalGeoData, updateFiles } from './updatefiles.js';
 // shared variables
 export var presetSegments;
 export var optimalPaces;
@@ -180,6 +180,11 @@ document.getElementById('clearButton').addEventListener('click', () => {
 
     // Clear session storage
     sessionStorage.clear();
+
+    presetSegments = null;
+    optimalPaces = null;
+    segmentLengths = null;
+    coordinates = null;
 
     // Reset the map
     if (window.myApp && window.myApp.map) {
